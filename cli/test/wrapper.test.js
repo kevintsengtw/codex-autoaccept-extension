@@ -1,0 +1,66 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const {parse, settings} = require('../lib/options');
+const {resolveCodex} = require('../lib/resolve');
+const {createSession} = require('../lib/session');
+const {evaluate} = require('../lib/policy');
+const sleep = ms => new Promise(resolve=>setTimeout(resolve,ms));
+const prompt = cmd => `Would you like to run the following command?\r\n\r\n $ ${cmd}\r\n\r\n› 1. Yes, proceed (y)\r\n  3. No, and tell Codex what to do differently (esc)\r\n\r\nPress enter to confirm or esc to cancel`;
+function session(t, enabled=true, extra={}) {
+  const sent=[], logs=[], sizes=[];
+  const s=createSession({child:{write:s=>sent.push(s),resize:(...s)=>sizes.push(s)}, settings:{...settings({}),enabled,...extra},cols:120,rows:40,log:(...s)=>logs.push(s)});
+  t.after(()=>s.stop());return {s,sent,logs,sizes};
+}
+test('wrapper flags stay separate from Codex arguments',()=>{
+  assert.deepEqual(parse(['--auto','--','resume','--last']),{enabled:true,codexArgs:['resume','--last']});
+  assert.throws(()=>parse(['--config']),/Missing/);
+  assert.throws(()=>parse(['resume']),/after --/);
+  assert.equal(settings({}).enabled,false);
+});
+test('config validates before spawn and --off overrides enabled',t=>{
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'codex-auto-cli-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+  const config=path.join(dir,'config.json');
+  fs.writeFileSync(config,JSON.stringify({enabled:true}));assert.equal(settings({config,enabled:false}).enabled,false);
+  fs.writeFileSync(config,JSON.stringify({denyPatterns:['[']}));assert.throws(()=>settings({config}));
+  fs.writeFileSync(config,JSON.stringify({enabled:'false'}));assert.throws(()=>settings({config}),/boolean/);
+});
+test('Windows npm shim launches official script through node without a command shell',()=>{
+  const files=new Set(['C:\\Program Files\\nodejs\\codex.cmd','C:\\Program Files\\nodejs\\node_modules\\@openai\\codex\\bin\\codex.js']);
+  const result=resolveCodex(undefined,{platform:'win32',env:{Path:'C:\\Program Files\\nodejs'},node:'C:\\node.exe',exists:f=>files.has(f)});
+  assert.deepEqual(result,{file:'C:\\node.exe',args:['C:\\Program Files\\nodejs\\node_modules\\@openai\\codex\\bin\\codex.js']});
+  assert.throws(()=>resolveCodex(undefined,{platform:'win32',env:{PATH:'C:\\tools'},exists:f=>f.endsWith('codex.cmd')}),/without the official/);
+});
+test('Windows executable override is passed directly',()=>{
+  assert.deepEqual(resolveCodex('C:\\tools\\codex.exe',{platform:'win32',exists:()=>true}),{file:'C:\\tools\\codex.exe',args:[]});
+});
+test('PowerShell/cmd destructive commands remain manual',()=>{
+  for(const cmd of ['Remove-Item -Recurse x','ri x','cmd /c del x','rd /s /q x','Format-Volume x','diskpart','iex x']) assert.equal(evaluate(cmd,settings({})).allow,false,cmd);
+});
+test('real ANSI processing sends y exactly once per visible prompt',async t=>{
+  const {s,sent}=session(t);s.feed('\x1b[2J\x1b[H'+prompt('echo hello'));await sleep(330);assert.deepEqual(sent,['y']);
+  s.feed('\x1b[H'+prompt('echo hello'));await sleep(330);assert.deepEqual(sent,['y']);
+  s.feed('\x1b[2J\x1b[Hfinished');await sleep(330);
+  s.feed('\x1b[2J\x1b[H'+prompt('echo hello'));await sleep(330);assert.deepEqual(sent,['y','y']);
+});
+test('Ctrl+] toggles; Ctrl+C and other input reach the child',async t=>{
+  const {s,sent}=session(t,false);s.feed(prompt('echo hi'));await sleep(330);assert.deepEqual(sent,[]);
+  s.input('\x1d');await sleep(330);assert.deepEqual(sent,['y']);
+  s.input('abc\x03');assert.deepEqual(sent,['y','abc\x03']);
+  s.input('\x1d');s.feed('\x1b[2J\x1b[H'+prompt('echo other'));await sleep(330);assert.equal(sent.length,2);
+});
+test('stop cancels pending keys; resize reaches PTY and emulator',async t=>{
+  const {s,sent,sizes}=session(t);s.resize(100,30);assert.deepEqual(sizes,[[100,30]]);
+  s.feed(prompt('echo hi'));s.stop();await sleep(330);assert.deepEqual(sent,[]);
+});
+test('dry run and denied prompt do not auto-answer',async t=>{
+  const {s,sent,logs}=session(t,true,{dryRun:true});s.feed(prompt('echo hi'));await sleep(330);assert.deepEqual(sent,[]);assert.equal(logs[0][0],'DRY_RUN');
+  const blocked=session(t);blocked.s.feed(prompt('Remove-Item -Recurse x'));await sleep(330);assert.deepEqual(blocked.sent,[]);assert.equal(blocked.logs[0][0],'MANUAL');
+});
+test('log errors stop approval before writing a key',async t=>{
+  const sent=[],errors=[];
+  const s=createSession({child:{write:s=>sent.push(s)},settings:{...settings({}),enabled:true},cols:120,rows:40,log:()=>{throw Error('disk full');},onError:e=>errors.push(e.message)});
+  t.after(()=>s.stop());s.feed(prompt('echo hi'));await sleep(330);assert.deepEqual(sent,[]);assert.deepEqual(errors,['disk full']);
+});

@@ -1,0 +1,15 @@
+node_modules/**
+src/**
+test/**
+docs/**
+.vscode/**
+build.js
+jsconfig.json
+package-lock.json
+.gitignore
+cli/**
+scripts/**
+*.zip
+*.sha256
+
+artifacts/**

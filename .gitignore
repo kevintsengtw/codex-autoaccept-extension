@@ -1,0 +1,11 @@
+node_modules/
+dist/
+*.vsix
+*.zip
+*.zip.sha256
+
+!artifacts/*.vsix
+!artifacts/*.zip
+!artifacts/SHA256SUMS
+.DS_Store
+*.log

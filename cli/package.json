@@ -1,0 +1,11 @@
+{
+  "name": "codex-autoaccept-cli",
+  "version": "0.1.0",
+  "description": "ConPTY wrapper with toggleable single-request approval for Codex CLI in Windows Terminal.",
+  "license": "MIT",
+  "engines": {"node": ">=22"},
+  "bin": {"codex-auto": "bin/codex-auto.js"},
+  "files": ["bin", "lib", "README.md", "LICENSE", "config.example.json", "codex-auto.cmd"],
+  "scripts": {"test": "node --test test/*.test.js"},
+  "dependencies": {"node-pty": "1.1.0", "@xterm/headless": "5.5.0"}
+}

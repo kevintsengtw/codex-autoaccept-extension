@@ -1,0 +1,149 @@
+{
+  "name": "codex-autoaccept",
+  "displayName": "Codex Auto-Accept",
+  "description": "Toggle automatic approval for Codex IDE requests and integrated-terminal CLI sessions.",
+  "version": "0.1.1",
+  "publisher": "local-tools",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.96.2"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": false
+    },
+    "virtualWorkspaces": {
+      "supported": false
+    }
+  },
+  "extensionKind": [
+    "workspace"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "codexAutoAccept.toggle",
+        "title": "Codex Auto-Accept: Toggle"
+      },
+      {
+        "command": "codexAutoAccept.startTerminal",
+        "title": "Codex Auto-Accept: Start Codex CLI"
+      },
+      {
+        "command": "codexAutoAccept.installGui",
+        "title": "Codex Auto-Accept: Install / Repair Codex GUI Integration"
+      },
+      {
+        "command": "codexAutoAccept.restoreGui",
+        "title": "Codex Auto-Accept: Restore Original Codex Extension"
+      },
+      {
+        "command": "codexAutoAccept.showLog",
+        "title": "Codex Auto-Accept: Show Log"
+      }
+    ],
+    "configuration": {
+      "title": "Codex Auto-Accept",
+      "properties": {
+        "codexAutoAccept.enabled": {
+          "type": "boolean",
+          "default": false,
+          "scope": "machine",
+          "description": "Auto-approve recognized Codex prompts. OFF by default. Read from user settings only."
+        },
+        "codexAutoAccept.terminalEnabled": {
+          "type": "boolean",
+          "default": true,
+          "scope": "machine",
+          "description": "Watch newly started Codex CLI shell executions."
+        },
+        "codexAutoAccept.guiEnabled": {
+          "type": "boolean",
+          "default": true,
+          "scope": "machine",
+          "description": "Approve command/file requests after GUI integration is installed."
+        },
+        "codexAutoAccept.approveFileChanges": {
+          "type": "boolean",
+          "default": true,
+          "scope": "machine",
+          "description": "Allow file-change approvals. File approval requests may omit the diff, so command deny rules cannot validate their contents."
+        },
+        "codexAutoAccept.dryRun": {
+          "type": "boolean",
+          "default": false,
+          "scope": "machine",
+          "description": "Log decisions without sending keys or approval responses."
+        },
+        "codexAutoAccept.allowPatterns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "scope": "machine",
+          "description": "Optional regular-expression allowlist. Empty allows recognized requests unless denied. Nonempty also restricts file request metadata."
+        },
+        "codexAutoAccept.denyPatterns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "scope": "machine",
+          "description": "Additional deny regular expressions; built-in destructive-command rules always apply. Invalid patterns stop auto-approval."
+        },
+        "codexAutoAccept.terminalColumns": {
+          "type": "integer",
+          "default": 120,
+          "minimum": 20,
+          "maximum": 1000,
+          "scope": "machine",
+          "description": "Shadow terminal dimension. Match your integrated terminal size for reliable ANSI screen reconstruction."
+        },
+        "codexAutoAccept.terminalRows": {
+          "type": "integer",
+          "default": 40,
+          "minimum": 10,
+          "maximum": 300,
+          "scope": "machine",
+          "description": "Shadow terminal dimension. Match your integrated terminal size for reliable ANSI screen reconstruction."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "node build.js",
+    "test": "node --test test/*.test.js",
+    "check": "tsc -p jsconfig.json --noEmit",
+    "vscode:prepublish": "npm run build",
+    "package": "vsce package --no-dependencies",
+    "test:cli": "npm --prefix cli test",
+    "package:cli": "python3 scripts/package-cli.py"
+  },
+  "dependencies": {
+    "@xterm/headless": "^5.5.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/vscode": "~1.96.0",
+    "@vscode/vsce": "^3.0.0",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.7.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kevintsengtw/codex-autoaccept-extension.git"
+  },
+  "homepage": "https://github.com/kevintsengtw/codex-autoaccept-extension#readme",
+  "bugs": {
+    "url": "https://github.com/kevintsengtw/codex-autoaccept-extension/issues"
+  }
+}
