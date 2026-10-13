@@ -28,3 +28,8 @@ User confirms 0.1.2 and supplies a log with both MANUAL clipped content and late
 ## 0.1.4 — 2026-10-13
 
 User log identifies missing complete approval heading despite a visibly present title. Reproduced using wrapped history then cursor-addressed writes padded with spaces without erase-line. Old reconstruction fails with exactly missing complete approval heading; fixed reconstruction passes. Structural approval rows now remain separate when stale isWrapped metadata would join them. Actual command wraps are still rejoined. Twenty-two CLI tests pass including dangerous commands on reused rows; company Windows verification pending.
+
+
+## 0.1.5 — 2026-10-13
+
+User reports diagnostic terminal output introduced in 0.1.3 occupies the TUI, confuses operation status, and led to manually repeating a command. Removed MANUAL/UNRECOGNIZED stderr writes; metadata diagnostics remain in cli.log. Startup, explicit user mode toggles and terminating errors still display. Session/detector behavior and 0.1.4 redraw fix remain unchanged. CLI tests and local macOS PTY self-test pass; company Windows verification pending.
