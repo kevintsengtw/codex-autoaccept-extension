@@ -1,6 +1,6 @@
 {
   "name": "codex-autoaccept-cli",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "ConPTY wrapper with toggleable single-request approval for Codex CLI in Windows Terminal.",
   "license": "MIT",
   "engines": {"node": ">=22"},

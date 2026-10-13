@@ -23,3 +23,8 @@ A user photograph shows an intact English Yes/No/footer approval menu, a long Re
 ## 0.1.3 diagnostic build — 2026-10-13
 
 User confirms 0.1.2 and supplies a log with both MANUAL clipped content and latest UNRECOGNIZED. The generic diagnostic cannot identify the failed parser stage. This build exposes heading/Yes/No/footer/command-prefix failures with terminal dimensions, logs CLI version on START, and prints MANUAL/UNRECOGNIZED messages in the terminal. Twenty tests pass, including a long multiline PowerShell command with Reason. No claim is made that this build fixes the exact reported prompt; live diagnostic output is needed.
+
+
+## 0.1.4 — 2026-10-13
+
+User log identifies missing complete approval heading despite a visibly present title. Reproduced using wrapped history then cursor-addressed writes padded with spaces without erase-line. Old reconstruction fails with exactly missing complete approval heading; fixed reconstruction passes. Structural approval rows now remain separate when stale isWrapped metadata would join them. Actual command wraps are still rejoined. Twenty-two CLI tests pass including dangerous commands on reused rows; company Windows verification pending.

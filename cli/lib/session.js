@@ -10,7 +10,10 @@ function createSession({child, settings, cols, rows, log, onError = err => {thro
       if (!line) continue;
       // Join only terminal-generated soft wraps; preserve explicit command newlines.
       const text = line.translateToString(!buffer.getLine(buffer.viewportY + i + 1)?.isWrapped);
-      if (line.isWrapped && lines.length) lines[lines.length - 1] += text;
+      // Cursor-addressed redraws can retain an old isWrapped flag. Approval
+      // UI boundaries must stay on their own line even on such reused rows.
+      const boundary = /^\s*(?:Would you like to |Allow command\?|Environment:|Reason:|Permission rule:|\$\s|[›❯>]?\s*\d+\. (?:Yes,|No,)|Press enter to confirm)/.test(text);
+      if (line.isWrapped && lines.length && !boundary) lines[lines.length - 1] += text;
       else lines.push(text);
     }
     return lines.join('\n').trimEnd();

@@ -141,3 +141,21 @@ test('long multiline pwsh execution block with reason and complete footer is rec
   s.feed('\x1b[2J\x1b[H'+prompt(script).replace('\r\n\r\n $','\r\nEnvironment: local\r\nReason: pwsh diagnostics\r\n\r\n $'));
   await sleep(330);assert.deepEqual(sent,['y']);
 });
+test('cursor redraw onto previously wrapped rows preserves approval boundaries',async t=>{
+  const {s,sent,logs}=session(t);s.resize(120,40);
+  // First create wrapped rows. TUI then reuses those rows via cursor movement,
+  // without an erase-screen sequence that would clear their wrap flags.
+  s.feed('\x1b[H'+'old history '.repeat(180));await sleep(40);
+  const rows=prompt('echo harmless').split('\r\n');
+  rows.forEach((line,i)=>s.feed(`\x1b[${i+2};1H${line.padEnd(119)}`));
+  s.feed(`\x1b[${rows.length+2};1H\x1b[J`);
+  await sleep(330);assert.deepEqual(sent,['y'],JSON.stringify(logs));
+});
+test('dangerous command on previously wrapped rows remains manual',async t=>{
+  const {s,sent,logs}=session(t);s.resize(120,40);
+  s.feed('\x1b[H'+'old history '.repeat(180));await sleep(40);
+  const rows=prompt('pwsh -Command "Remove-Item -Recurse x"').split('\r\n');
+  rows.forEach((line,i)=>s.feed(`\x1b[${i+2};1H${line.padEnd(119)}`));
+  s.feed(`\x1b[${rows.length+2};1H\x1b[J`);
+  await sleep(330);assert.deepEqual(sent,[]);assert.deepEqual(logs.at(-1),['MANUAL','deny rule']);
+});
