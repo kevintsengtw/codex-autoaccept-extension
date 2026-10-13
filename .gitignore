@@ -9,3 +9,20 @@ dist/
 !artifacts/SHA256SUMS
 .DS_Store
 *.log
+
+desktop-probe/bin/
+desktop-probe/obj/
+desktop-probe/reports/
+desktop-probe/verify/bin/
+desktop-probe/verify/obj/
+
+desktop-probe/manual/bin/
+desktop-probe/manual/obj/
+
+desktop-probe/tray/bin/
+desktop-probe/tray/obj/
+
+# Local code graph, extracted test builds and runtime evidence are not releases.
+graphify-out/
+.desktop-test/
+desktop-probe/windows-test-results/

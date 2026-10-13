@@ -24,9 +24,21 @@ VS Code 版與 Windows CLI 包裝器分別版本化，兩個開關互不連動�
 | 繁體中文「允許一次」核准 | 使用者已確認上述 GUI 情境可使用；GUI 不依賴按鈕文字 |
 | VS Code 整合終端機 Codex CLI | 自動化測試通過，實際公司環境端到端測試待驗證 |
 | Windows Terminal Codex CLI | 包裝器測試及 macOS PTY self-test 通過；Windows ConPTY 與真實 Codex 待驗證 |
-| Codex 桌面 App | 不包含，開發暫緩 |
+| Codex 桌面 App | 公司一般權限、App `26.803.81509`：唯讀探測與手動 Invoke 已成功；使用者已確認 0.2.1 只按一次 O 即連續三次自動核准、保持 ON，按 F 停止 |
 
 詳細測試紀錄見 [VS Code 驗證說明](docs/VERIFICATION.md) 與 [CLI 驗證說明](cli/VERIFICATION.md)。
+
+## Windows 桌面 App：系統匣常駐工具
+
+[下載 Windows 系統匣版 0.3.7](artifacts/codex-autoaccept-desktop-windows-0.3.7.zip)。完整解壓後，雙擊 **`CodexAutoAcceptDesktop.exe`**，不需 Windows Terminal。第一次選取 ChatGPT App 視窗，再用滑鼠開啟 ON；關閉設定視窗仍會留在系統匣，右鍵圖示可切 ON／OFF 或退出。
+
+每次啟動都 OFF，由使用者手動開啟。可選擇登入 Windows 時啟動，只設定目前使用者的 Run 值；公司政策阻擋時會顯示錯誤。需要 Windows .NET Framework 4.8／4.8.1，以及公司允許前後端 EXE 執行，不要求管理員權限。
+
+公司 App `26.803.81509` 已確認 0.2.1 持續 ON／OFF，以及 0.3.2 一般使用者連接與基本核准。2026-10-13 的 0.3.7 公司回報：背景與最小化都有核准請求但不會自動處理，鎖定未測；先前將完全遮蔽視為已驗收的結論已撤回。0.3.7 移除畫面診斷區，改為正常 ON 時自動寫中文 log 與短摘要，可稍後手動轉抄「回報碼＋結果」，不需記住時間或送出檔案。公司 extension／CLI／Desktop 均只能使用「請求核准」，不能依賴 Approve for me／Full Access。此版沒有宣稱修好上述背景情境，也尚無命令規則或聊天 ID 綁定。
+
+使用與更新見 [桌面版說明](desktop-probe/tray/README.md)，紀錄格式見 [log 說明](desktop-probe/LOG_FORMAT.md)，歷史與驗證見 [桌面工具驗證](desktop-probe/VERIFICATION.md)。成品仍附舊探測 CLI 原始碼與工具，日常操作不需要使用。
+
+另一台 Windows 11 可直接 clone／pull 此 repo，依 [Windows 驗證交接](desktop-probe/WINDOWS_HANDOFF.md) 取得 0.3.7 基準、驗證 checksum 並測真實核准；給 Windows Codex Desktop 的 [起始提示詞](desktop-probe/WINDOWS_CODEX_PROMPT.md) 及 [結果模板](desktop-probe/WINDOWS_TEST_RESULTS_TEMPLATE.md) 已整理。Computer Use 是否能操作原生 Windows 視窗，需由該會話的實際工具能力確認；此處沒有宣稱已在 Windows 完成驗證。
 
 ## VS Code 安裝：Codex 側邊欄
 

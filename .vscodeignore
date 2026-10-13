@@ -13,3 +13,5 @@ scripts/**
 *.sha256
 
 artifacts/**
+
+desktop-probe/**

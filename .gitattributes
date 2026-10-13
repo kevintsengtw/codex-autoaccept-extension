@@ -1,0 +1,3 @@
+# This synthetic example intentionally matches the Windows log's BOM/CRLF
+# bytes and final blank separator; do not normalize it on clone/check-out.
+desktop-probe/examples/log-format-example.txt -text whitespace=cr-at-eol,-blank-at-eof

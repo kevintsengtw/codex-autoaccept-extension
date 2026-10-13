@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType><TargetFramework>net48</TargetFramework><LangVersion>latest</LangVersion>
+    <AssemblyName>CodexAutoAcceptDesktop</AssemblyName><Version>0.3.7</Version><Prefer32Bit>false</Prefer32Bit>
+    <ApplicationIcon>app.ico</ApplicationIcon>
+    <ApplicationManifest>../app.manifest</ApplicationManifest><RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="All" />
+    <Reference Include="System.Windows.Forms" /><Reference Include="System.Drawing" /><Reference Include="System.Web.Extensions" />
+  </ItemGroup>
+</Project>
