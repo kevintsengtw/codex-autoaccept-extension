@@ -18,3 +18,8 @@ Local macOS real-PTY self-test of the updated session returned PASS. This fixtur
 ## 0.1.2 — 2026-10-13
 
 A user photograph shows an intact English Yes/No/footer approval menu, a long Reason section, and a long pwsh-related execution block. Photo resolution does not establish which clipping token caused the particular stop. A regression fixture reproduces the overly broad check: an ellipsis/deny token in Reason blocks an otherwise complete harmless command. Command policy and clipping checks now operate only on the `$` execution block before the menu. File approvals retain their content checks. 18 CLI tests pass, including Reason false-positive and genuine clipped/destructive command rejection. Company Windows live verification remains pending.
+
+
+## 0.1.3 diagnostic build — 2026-10-13
+
+User confirms 0.1.2 and supplies a log with both MANUAL clipped content and latest UNRECOGNIZED. The generic diagnostic cannot identify the failed parser stage. This build exposes heading/Yes/No/footer/command-prefix failures with terminal dimensions, logs CLI version on START, and prints MANUAL/UNRECOGNIZED messages in the terminal. Twenty tests pass, including a long multiline PowerShell command with Reason. No claim is made that this build fixes the exact reported prompt; live diagnostic output is needed.

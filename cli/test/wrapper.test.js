@@ -117,3 +117,27 @@ test('actual execution block clipping and destructive pwsh remain manual despite
     assert.equal(detect(full,settings({})).allow,false);
   }
 });
+test('diagnostics distinguish missing heading, options, footer and command without exposing script',()=>{
+  const {diagnose}=require('../lib/detector');
+  const full=prompt('pwsh -Command "private-company-script"');
+  assert.equal(diagnose(full),'');
+  const cases=[
+    ['Would you like to run the following command?','not an approval heading','heading'],
+    ['Yes, proceed (y)','Allow once','Yes'],
+    ['No, and tell Codex what to do differently (esc)','Cancel','No'],
+    ['Press enter to confirm or esc to cancel','confirm','footer'],
+    [' $ pwsh',' pwsh','command start']
+  ];
+  for(const [from,to,reason] of cases) {
+    const diagnostic=diagnose(full.replace(from,to));
+    assert.ok(diagnostic.includes(reason),diagnostic);
+    assert.ok(!diagnostic.includes('private-company-script'));
+  }
+  assert.ok(diagnose(full+'\nextra status').includes('footer'));
+});
+test('long multiline pwsh execution block with reason and complete footer is recognized',async t=>{
+  const {s,sent}=session(t);s.resize(180,60);
+  const script='$ErrorActionPreference = "Continue";\r\n'+Array.from({length:20},(_,i)=>`Write-Output "diagnostic ${i}"`).join('\r\n');
+  s.feed('\x1b[2J\x1b[H'+prompt(script).replace('\r\n\r\n $','\r\nEnvironment: local\r\nReason: pwsh diagnostics\r\n\r\n $'));
+  await sleep(330);assert.deepEqual(sent,['y']);
+});

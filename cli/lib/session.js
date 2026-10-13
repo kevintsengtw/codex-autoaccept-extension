@@ -1,5 +1,5 @@
 const {Terminal} = require('@xterm/headless');
-const {detect} = require('./detector');
+const {detect, diagnose} = require('./detector');
 function createSession({child, settings, cols, rows, log, onError = err => {throw err;}, setTimer = setTimeout, clearTimer = clearTimeout}) {
   const screen = new Terminal({cols, rows, scrollback: 0, allowProposedApi: true});
   let ended = false, timer, last = '', diagnostic = '', writing = 0;
@@ -21,7 +21,7 @@ function createSession({child, settings, cols, rows, log, onError = err => {thro
     const result = detect(text, settings);
     if (!result) {
       if (text.trim() && !/Would you like to|Allow command\?|Yes, proceed|No, and tell Codex/.test(text)) last = '';
-      const reason = /Would you like to|Allow command\?/.test(text) ? 'approval menu incomplete or unsupported; check terminal size and Codex version' : '';
+      const reason = /Would you like to|Allow command\?/.test(text) ? `${diagnose(text)}; terminal=${screen.cols}x${screen.rows}` : '';
       if (reason && reason !== diagnostic) log('UNRECOGNIZED', reason);
       diagnostic = reason;
       return;
