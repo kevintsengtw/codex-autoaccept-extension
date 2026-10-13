@@ -104,3 +104,16 @@ test('partial redraw of an accepted menu does not send another approval',async t
   s.feed('\x1b[2J\x1b[H'+prompt('echo hi'));await sleep(330);
   assert.deepEqual(sent,['y']);
 });
+test('reason summaries do not mark a complete pwsh command as clipped or denied',async t=>{
+  const {s,sent}=session(t);
+  const full=prompt('pwsh -Command "Write-Output hello; Get-Process | Select-Object Name"')
+    .replace('\r\n\r\n $', '\r\nEnvironment: local\r\nReason: pwsh ... diagnostic summary … Ctrl+O; mentions Remove-Item for context\r\n\r\n $');
+  s.feed('\x1b[2J\x1b[H'+full);await sleep(330);assert.deepEqual(sent,['y']);
+});
+test('actual execution block clipping and destructive pwsh remain manual despite harmless reason',()=>{
+  const {detect}=require('../lib/detector');
+  for (const cmd of ['pwsh -Command "echo …"','pwsh -Command "Remove-Item -Recurse x"']) {
+    const full=prompt(cmd).replace('\r\n\r\n $','\r\nReason: harmless diagnostic\r\n\r\n $');
+    assert.equal(detect(full,settings({})).allow,false);
+  }
+});
