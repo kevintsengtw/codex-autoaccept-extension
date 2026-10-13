@@ -4,11 +4,12 @@ function createSession({child, settings, cols, rows, log, onError = err => {thro
   const screen = new Terminal({cols, rows, scrollback: 0, allowProposedApi: true});
   let ended = false, timer, last = '', diagnostic = '', writing = 0;
   function snapshot() {
-    const buffer = screen.buffer.active, lines = [];
+    const buffer = screen.buffer.active, lines = [], physical = [];
     for (let i = 0; i < screen.rows; i++) {
       const line = buffer.getLine(buffer.viewportY + i);
       if (!line) continue;
       // Join only terminal-generated soft wraps; preserve explicit command newlines.
+      physical.push(line.translateToString(true));
       const text = line.translateToString(!buffer.getLine(buffer.viewportY + i + 1)?.isWrapped);
       // Cursor-addressed redraws can retain an old isWrapped flag. Approval
       // UI boundaries must stay on their own line even on such reused rows.
@@ -16,25 +17,31 @@ function createSession({child, settings, cols, rows, log, onError = err => {thro
       if (line.isWrapped && lines.length && !boundary) lines[lines.length - 1] += text;
       else lines.push(text);
     }
-    return lines.join('\n').trimEnd();
+    return {logical: lines.join('\n').trimEnd(), physical: physical.join('\n').trimEnd()};
   }
   function inspect() {
     if (ended || writing || !settings.enabled) return;
-    const text = snapshot();
-    const result = detect(text, settings);
+    const {logical: text, physical} = snapshot();
+    // Logical rows restore soft wraps; physical rows independently preserve UI boundaries.
+    // Retry only unrecognized layouts, never override a policy/clipping rejection.
+    let result = detect(text, settings);
+    let fallback = false;
+    if (!result) {result = detect(physical, settings); fallback = !!result;}
     if (!result) {
       if (text.trim() && !/Would you like to|Allow command\?|Yes, proceed|No, and tell Codex/.test(text)) last = '';
-      const reason = /Would you like to|Allow command\?/.test(text) ? `${diagnose(text)}; terminal=${screen.cols}x${screen.rows}` : '';
+      const reason = /Would you like to|Allow command\?/.test(text) ? `logical=${diagnose(text)}; physical=${diagnose(physical)}; terminal=${screen.cols}x${screen.rows}` : '';
       if (reason && reason !== diagnostic) log('UNRECOGNIZED', reason);
       diagnostic = reason;
       return;
     }
     diagnostic = '';
+    // Different row representations of the same screen must not resend a key.
+    result.identity = result.identity.replace(/\s+/g, '');
     if (last === result.identity) return;
     last = result.identity;
     if (!result.allow || !('key' in result)) { log('MANUAL', result.reason); return; }
     if (settings.dryRun) { log('DRY_RUN', 'would approve once'); return; }
-    log('ACCEPT', 'once');
+    log('ACCEPT', fallback ? 'once; physical-row fallback' : 'once');
     child.write(result.key);
   }
   function schedule() {
@@ -56,7 +63,7 @@ function createSession({child, settings, cols, rows, log, onError = err => {thro
         if (!ended) {
           // Observe prompt disappearance even when the next identical prompt arrives
           // before the deadline. Only an intact menu can be approved by inspect().
-          const text = snapshot();
+          const {logical: text} = snapshot();
           if (text.trim() && !/Would you like to|Allow command\?|Yes, proceed|No, and tell Codex/.test(text)) last = '';
           schedule();
         }

@@ -159,3 +159,41 @@ test('dangerous command on previously wrapped rows remains manual',async t=>{
   s.feed(`\x1b[${rows.length+2};1H\x1b[J`);
   await sleep(330);assert.deepEqual(sent,[]);assert.deepEqual(logs.at(-1),['MANUAL','deny rule']);
 });
+test('standalone dollar marker is followed by full execution content and policy',()=>{
+  const {detect}=require('../lib/detector');
+  const full=prompt('echo hello').replace(' $ echo hello',' $\r\n echo hello');
+  assert.equal(detect(full,settings({})).allow,true);
+  assert.equal(detect(full.replace('echo hello','Remove-Item -Recurse x'),settings({})).allow,false);
+  assert.equal(detect(full.replace('echo hello','echo …'),settings({})).allow,false);
+  assert.equal(detect(full.replace(' $\r\n echo hello','Reason: echo hello'),settings({})),null);
+});
+test('physical rows recover a dollar marker merged into reason by stale wrap flags',async t=>{
+  const {s,sent,logs}=session(t);s.resize(120,40);
+  s.feed('\x1b[H'+'old history '.repeat(180));await sleep(40);
+  const full=prompt('echo hello').replace(' $ echo hello',' $\r\n echo hello')
+    .replace('\r\n\r\n $','\r\nReason: diagnostic\r\n $');
+  const rows=full.split('\r\n');
+  rows.forEach((line,i)=>s.feed(`\x1b[${i+2};1H${line.trim() === '$' ? ' '.repeat(119) + '$' : line.padEnd(119)}`));
+  s.feed(`\x1b[${rows.length+2};1H\x1b[J`);await sleep(330);
+  assert.deepEqual(sent,['y'],JSON.stringify(logs));
+  assert.deepEqual(logs.at(-1),['ACCEPT','once; physical-row fallback']);
+  // Same prompt redrawn without stale wrap metadata must not cause another key.
+  s.feed('\x1b[2J\x1b[H'+full);await sleep(330);assert.deepEqual(sent,['y']);
+});
+test('physical fallback never bypasses deny policy on the recovered execution',async t=>{
+  const {s,sent,logs}=session(t);s.resize(120,40);
+  s.feed('\x1b[H'+'old history '.repeat(180));await sleep(40);
+  const full=prompt('Remove-Item -Recurse x').replace(' $ Remove-Item',' $\r\n Remove-Item')
+    .replace('\r\n\r\n $','\r\nReason: harmless summary\r\n $');
+  const rows=full.split('\r\n');
+  rows.forEach((line,i)=>s.feed(`\x1b[${i+2};1H${line.padEnd(119)}`));
+  s.feed(`\x1b[${rows.length+2};1H\x1b[J`);await sleep(330);
+  assert.deepEqual(sent,[]);assert.deepEqual(logs.at(-1),['MANUAL','deny rule']);
+});
+test('a known hidden-lines footer does not allow unseen command content',()=>{
+  const {detect}=require('../lib/detector');
+  const full=prompt('echo shown\r\n… +188 lines ctrl+a to view all');
+  assert.equal(detect(full,settings({})).allow,false);
+  const noEllipsis=prompt('echo shown\r\n+188 lines ctrl+a to view all');
+  assert.equal(detect(noEllipsis,settings({})).reason,'clipped content');
+});

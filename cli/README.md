@@ -1,4 +1,4 @@
-# Codex Auto-Accept CLI — Windows 測試版 0.1.5
+# Codex Auto-Accept CLI — Windows 測試版 0.1.6
 
 在 Windows Terminal 內透過 ConPTY 啟動 Codex，辨識完整英文核准選單後送出單次 `y`。與 VS Code 擴充套件分開運作，不需要 VS Code，也不修改 Codex config、sandbox 或企業 managed requirements。
 
@@ -6,8 +6,8 @@
 
 條件：Windows 11 或支援 ConPTY 的 Windows 10（1903／build 18362 以上），**原生 Windows Node.js 22／24，x64 或 ARM64**，以及已可執行的 Codex CLI。此套件不是獨立 EXE，不包含 Node.js 或 Codex。
 
-1. 解壓縮 `codex-autoaccept-cli-windows-0.1.5.zip`。
-2. Windows Terminal 開啟 PowerShell，進入解壓縮的 `codex-autoaccept-cli-0.1.5` 資料夾。
+1. 解壓縮 `codex-autoaccept-cli-windows-0.1.6.zip`。
+2. Windows Terminal 開啟 PowerShell，進入解壓縮的 `codex-autoaccept-cli-0.1.6` 資料夾。
 3. 檢查環境並跑自我測試：
 
 ```powershell
@@ -34,13 +34,13 @@ npm.cmd ci
 
 ```powershell
 cd C:\work\my-project
-& 'C:\tools\codex-autoaccept-cli-0.1.5\codex-auto.cmd' --auto
+& 'C:\tools\codex-autoaccept-cli-0.1.6\codex-auto.cmd' --auto
 ```
 
 請將上面工具路徑改為你的解壓縮位置。所有 Codex 參數放在 `--` 後面：
 
 ```powershell
-& 'C:\tools\codex-autoaccept-cli-0.1.5\codex-auto.cmd' --auto -- resume
+& 'C:\tools\codex-autoaccept-cli-0.1.6\codex-auto.cmd' --auto -- resume
 ```
 
 預設 OFF；只有 `--auto` 或指定 config 裡的 `enabled: true` 會開啟。執行中按 **Ctrl+]** 切換 ON／OFF，終端機會顯示目前模式。`Ctrl+C`、方向鍵、貼上與一般輸入會轉送給 Codex；`Ctrl+]` 為包裝器保留熱鍵。如果鍵盤配置無法送出 Ctrl+]，可退出後用 `--auto` / `--off` 重啟。
@@ -48,7 +48,7 @@ cd C:\work\my-project
 建議首次真實 Codex 測試先使用 dry run：
 
 ```powershell
-& 'C:\tools\codex-autoaccept-cli-0.1.5\codex-auto.cmd' --auto --dry-run
+& 'C:\tools\codex-autoaccept-cli-0.1.6\codex-auto.cmd' --auto --dry-run
 ```
 
 dry run 只記錄可辨識的提示，不會自動送鍵；仍可手動確認。按 Ctrl+] 也不會解除 dry run。
@@ -58,7 +58,7 @@ dry run 只記錄可辨識的提示，不會自動送鍵；仍可手動確認。
 設定只從你明確傳入的檔案載入，不會從專案自動搜尋：
 
 ```powershell
-& 'C:\tools\codex-autoaccept-cli-0.1.5\codex-auto.cmd' --config 'C:\tools\codex-autoaccept-cli-0.1.5\config.example.json' --auto
+& 'C:\tools\codex-autoaccept-cli-0.1.6\codex-auto.cmd' --config 'C:\tools\codex-autoaccept-cli-0.1.6\config.example.json' --auto
 ```
 
 JSON 支援 `enabled`、`dryRun`、`approveFileChanges`、`allowPatterns`、`denyPatterns`。規則是 JavaScript regex，不是 glob；無效 JSON、型別或 regex 會在啟動 Codex 前拒絕啟動。變更檔案後需重新啟動；Ctrl+] 的狀態不會寫回檔案。
@@ -128,3 +128,14 @@ Get-Content "$env:LOCALAPPDATA\CodexAutoAccept\cli.log" -Tail 20 -Wait
 ## 0.1.5：移除互動畫面的自動診斷輸出
 
 不再把 MANUAL／UNRECOGNIZED 寫入正在使用的 Codex terminal，以免診斷占用畫面、干擾 TUI 或讓使用者誤判操作狀態。所有自動決策與辨識診斷只寫入 cli.log；啟動資訊、使用者 Ctrl+] 切換回饋及終止錯誤仍會顯示。保留 0.1.4 的標題重繪修正。
+
+## 0.1.6：畫面逐行結構的備援辨識測試版
+
+- 保留接回 soft wrap 的主要辨識；若選單無法辨識，再對保留 physical row 界線的畫面辨識。
+- 允許獨立一行的 `$` 提示符接著完整命令，仍要求完整標題、Yes／No、footer 和實際執行區塊。
+- 主辨識已判為拒絕或截斷時，不使用備援繞過它；兩種表示切換時不重複送鍵。
+- 備援成功的 log 為 `ACCEPT once; physical-row fallback`，失敗時列出 logical／physical 的各別原因；不包含完整命令或畫面。
+- 針對 `+數字 lines … ctrl+a … view all` 的明確隱藏行提示保留人工確認，這版不自動展開。
+- 輸入與貼上轉送維持 0.1.5，沒有加入 prompt-file 或新貼上捷徑。診斷仍只寫 log。
+
+26 項測試通過。用舊 0.1.5 重跑回歸 fixture 會得到使用者回報的 missing command start；新版可辨識。這是局部重現，尚不能保證公司畫面的原因完全相同。公司 Windows 實測待回報。

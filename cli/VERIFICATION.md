@@ -33,3 +33,10 @@ User log identifies missing complete approval heading despite a visibly present 
 ## 0.1.5 — 2026-10-13
 
 User reports diagnostic terminal output introduced in 0.1.3 occupies the TUI, confuses operation status, and led to manually repeating a command. Removed MANUAL/UNRECOGNIZED stderr writes; metadata diagnostics remain in cli.log. Startup, explicit user mode toggles and terminating errors still display. Session/detector behavior and 0.1.4 redraw fix remain unchanged. CLI tests and local macOS PTY self-test pass; company Windows verification pending.
+
+
+## User-reported 0.1.5 Windows run and 0.1.6 test build — 2026-10-13
+
+User reports one uninterrupted Windows 0.1.5 run using right-click paste; log shows repeated ACCEPT. Later a long pwsh approval stops with missing command start ($ prefix), terminal=209x51. Ctrl+V prompt splitting remains unresolved.
+
+0.1.6 retries unrecognized logical layouts with independent physical rows; supports standalone dollar markers followed by execution content; normalizes decision identity across representations. Policy/clipping denials are not overridden. Explicit hidden-lines markers remain manual. No input-forwarding change or UI diagnostic output. Twenty-six tests pass including physical-row recovery, deny/clipping enforcement and deduplication. Original 0.1.5 fails the recovery regression with the user's same diagnostic; the updated logic passes. This demonstrates a possible cause, not proof of the exact company screen. Windows live verification pending.
