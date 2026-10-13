@@ -13,7 +13,7 @@
 | 成品 | 版本 | 用途 |
 | --- | --- | --- |
 | [codex-autoaccept-0.1.1.vsix](artifacts/codex-autoaccept-0.1.1.vsix) | 0.1.1 | VS Code 擴充套件 |
-| [codex-autoaccept-cli-windows-0.1.0.zip](artifacts/codex-autoaccept-cli-windows-0.1.0.zip) | 0.1.0 | Windows Terminal 獨立 CLI 測試版 |
+| [codex-autoaccept-cli-windows-0.1.1.zip](artifacts/codex-autoaccept-cli-windows-0.1.1.zip) | 0.1.1 | Windows Terminal 獨立 CLI 測試版 |
 | [SHA256SUMS](artifacts/SHA256SUMS) | — | 成品雜湊值 |
 
 VS Code 版與 Windows CLI 包裝器分別版本化，兩個開關互不連動。本專案目前使用 VSIX 發佈，**尚未上架 VS Code Marketplace**。
@@ -23,7 +23,7 @@ VS Code 版與 Windows CLI 包裝器分別版本化，兩個開關互不連動�
 | 公司 Windows：VS Code Codex 側邊欄 | 使用者已確認 0.1.1 可自動核准，官方 Codex 為 `26.1002.51308`；首次成功前需要安裝 GUI 整合 |
 | 繁體中文「允許一次」核准 | 使用者已確認上述 GUI 情境可使用；GUI 不依賴按鈕文字 |
 | VS Code 整合終端機 Codex CLI | 自動化測試通過，實際公司環境端到端測試待驗證 |
-| Windows Terminal Codex CLI | 包裝器測試及 macOS PTY self-test 通過；Windows ConPTY 與真實 Codex 待驗證 |
+| Windows Terminal Codex CLI | 使用者確認 0.1.0 可自動核准但偶爾漏辨識；0.1.1 修正持續重繪與折行，Windows 實測待回報 |
 | Codex 桌面 App | 公司一般權限、App `26.803.81509`：唯讀探測與手動 Invoke 已成功；使用者已確認 0.2.1 只按一次 O 即連續三次自動核准、保持 ON，按 F 停止 |
 
 詳細測試紀錄見 [VS Code 驗證說明](docs/VERIFICATION.md) 與 [CLI 驗證說明](cli/VERIFICATION.md)。
@@ -155,8 +155,8 @@ CLI 目前只辨識官方**英文完整核准選單**，包含 `Yes, proceed (y)
 
 ### 安裝與自我測試
 
-1. 解壓縮 `codex-autoaccept-cli-windows-0.1.0.zip`。
-2. Windows Terminal 開啟 PowerShell，進入解壓縮後的 `codex-autoaccept-cli-0.1.0` 目錄。
+1. 解壓縮 `codex-autoaccept-cli-windows-0.1.1.zip`。
+2. Windows Terminal 開啟 PowerShell，進入解壓縮後的 `codex-autoaccept-cli-0.1.1` 目錄。
 3. 執行：
 
    ```powershell
@@ -175,7 +175,7 @@ ZIP 已含 npm 提供的 Windows x64／ARM64 `node-pty` 依賴，正常解壓後
 
 ```powershell
 cd C:\work\my-project
-& 'C:\tools\codex-autoaccept-cli-0.1.0\codex-auto.cmd' --auto
+& 'C:\tools\codex-autoaccept-cli-0.1.1\codex-auto.cmd' --auto
 ```
 
 請將路徑換成你的解壓縮位置。預設 OFF，`--auto` 開啟，`--off` 關閉；執行中 **Ctrl+]** 切換，狀態不寫回 config。若鍵盤無法送出熱鍵，退出後以啟動參數切換。
@@ -183,13 +183,13 @@ cd C:\work\my-project
 Codex 自己的參數必須放在 `--` 後：
 
 ```powershell
-& 'C:\tools\codex-autoaccept-cli-0.1.0\codex-auto.cmd' --auto -- resume
+& 'C:\tools\codex-autoaccept-cli-0.1.1\codex-auto.cmd' --auto -- resume
 ```
 
 首次真實測試建議 dry run：
 
 ```powershell
-& 'C:\tools\codex-autoaccept-cli-0.1.0\codex-auto.cmd' --auto --dry-run
+& 'C:\tools\codex-autoaccept-cli-0.1.1\codex-auto.cmd' --auto --dry-run
 ```
 
 `--dry-run` 只記錄，不送鍵；Ctrl+] 不會解除 dry run。一般輸入、Ctrl+C、貼上和方向鍵轉送給 Codex。
@@ -265,7 +265,7 @@ CLI ZIP 打包腳本需要 Python 3，成品會包含 npm 提供的 Windows 原�
 | `docs/` | 驗證紀錄 |
 | `artifacts/` | 已打包 VSIX、Windows ZIP 及 checksum |
 
-0.1.1 修正開關寫入與刷新、快速連點、失敗回報，並保留錯誤設定下的使用者開關意圖；自動核准仍暫停至設定修正。Windows CLI 測試版為 0.1.0。
+0.1.1 修正開關寫入與刷新、快速連點、失敗回報，並保留錯誤設定下的使用者開關意圖；自動核准仍暫停至設定修正。Windows CLI 測試版為 0.1.1。
 
 ## 參考來源與授權
 

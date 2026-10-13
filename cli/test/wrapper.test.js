@@ -64,3 +64,43 @@ test('log errors stop approval before writing a key',async t=>{
   const s=createSession({child:{write:s=>sent.push(s)},settings:{...settings({}),enabled:true},cols:120,rows:40,log:()=>{throw Error('disk full');},onError:e=>errors.push(e.message)});
   t.after(()=>s.stop());s.feed(prompt('echo hi'));await sleep(330);assert.deepEqual(sent,[]);assert.deepEqual(errors,['disk full']);
 });
+
+test('continuous redraw cannot starve approval evaluation',async t=>{
+  const {s,sent}=session(t);
+  s.feed('\x1b[2J\x1b[H'+prompt('echo hi'));
+  for(let i=0;i<10;i++) {await sleep(60);s.feed('\x1b[H'+prompt('echo hi'));}
+  assert.deepEqual(sent,['y']);
+});
+test('soft wrapped menu and command are reconstructed in a narrow terminal',async t=>{
+  const {s,sent}=session(t);s.resize(28,40);
+  s.feed('\x1b[2J\x1b[H'+prompt('echo this-is-a-long-harmless-command'));
+  await sleep(330);assert.deepEqual(sent,['y']);
+  s.resize(35,40);await sleep(330);assert.deepEqual(sent,['y']);
+});
+test('two identical approvals separated by brief output each receive one key',async t=>{
+  const {s,sent}=session(t);s.feed('\x1b[2J\x1b[H'+prompt('echo hi'));
+  await sleep(330);assert.deepEqual(sent,['y']);
+  s.feed('\x1b[2J\x1b[Hdone');await sleep(30);
+  s.feed('\x1b[2J\x1b[H'+prompt('echo hi'));await sleep(330);
+  assert.deepEqual(sent,['y','y']);
+});
+test('incomplete menu logs metadata and remains manual until complete',async t=>{
+  const {s,sent,logs}=session(t);
+  s.feed('Would you like to run the following command?');await sleep(330);
+  assert.deepEqual(sent,[]);assert.equal(logs[0][0],'UNRECOGNIZED');
+  assert.equal(logs[0][1].includes('echo'),false);
+  s.feed('\x1b[2J\x1b[H'+prompt('echo hi'));await sleep(330);assert.deepEqual(sent,['y']);
+});
+test('wrapped destructive commands and clipped content still stay manual',async t=>{
+  const {s,sent,logs}=session(t);s.resize(28,40);
+  s.feed('\x1b[2J\x1b[H'+prompt('Remove-Item -Recurse company-folder'));await sleep(330);
+  assert.deepEqual(sent,[]);assert.deepEqual(logs[0],['MANUAL','deny rule']);
+  s.feed('\x1b[2J\x1b[H'+prompt('echo clipped…'));await sleep(330);
+  assert.deepEqual(sent,[]);assert.equal(logs.at(-1)[1],'clipped content');
+});
+test('partial redraw of an accepted menu does not send another approval',async t=>{
+  const {s,sent}=session(t);s.feed('\x1b[2J\x1b[H'+prompt('echo hi'));await sleep(330);
+  s.feed('\x1b[2J\x1b[HWould you like to run the following command?');await sleep(330);
+  s.feed('\x1b[2J\x1b[H'+prompt('echo hi'));await sleep(330);
+  assert.deepEqual(sent,['y']);
+});

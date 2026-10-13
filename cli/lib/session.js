@@ -2,13 +2,31 @@ const {Terminal} = require('@xterm/headless');
 const {detect} = require('./detector');
 function createSession({child, settings, cols, rows, log, onError = err => {throw err;}, setTimer = setTimeout, clearTimer = clearTimeout}) {
   const screen = new Terminal({cols, rows, scrollback: 0, allowProposedApi: true});
-  let ended = false, timer, last = '', generation = 0, writing = 0;
+  let ended = false, timer, last = '', diagnostic = '', writing = 0;
+  function snapshot() {
+    const buffer = screen.buffer.active, lines = [];
+    for (let i = 0; i < screen.rows; i++) {
+      const line = buffer.getLine(buffer.viewportY + i);
+      if (!line) continue;
+      // Join only terminal-generated soft wraps; preserve explicit command newlines.
+      const text = line.translateToString(!buffer.getLine(buffer.viewportY + i + 1)?.isWrapped);
+      if (line.isWrapped && lines.length) lines[lines.length - 1] += text;
+      else lines.push(text);
+    }
+    return lines.join('\n').trimEnd();
+  }
   function inspect() {
     if (ended || writing || !settings.enabled) return;
-    const buffer = screen.buffer.active;
-    const text = Array.from({length: screen.rows}, (_, i) => buffer.getLine(buffer.viewportY + i)?.translateToString(true) ?? '').join('\n').trimEnd();
+    const text = snapshot();
     const result = detect(text, settings);
-    if (!result) { last = ''; return; }
+    if (!result) {
+      if (text.trim() && !/Would you like to|Allow command\?|Yes, proceed|No, and tell Codex/.test(text)) last = '';
+      const reason = /Would you like to|Allow command\?/.test(text) ? 'approval menu incomplete or unsupported; check terminal size and Codex version' : '';
+      if (reason && reason !== diagnostic) log('UNRECOGNIZED', reason);
+      diagnostic = reason;
+      return;
+    }
+    diagnostic = '';
     if (last === result.identity) return;
     last = result.identity;
     if (!result.allow || !('key' in result)) { log('MANUAL', result.reason); return; }
@@ -16,15 +34,29 @@ function createSession({child, settings, cols, rows, log, onError = err => {thro
     log('ACCEPT', 'once');
     child.write(result.key);
   }
-  function schedule() { clearTimer(timer); timer = setTimer(() => {try {inspect();} catch (err) {onError(err);}}, 250); }
+  function schedule() {
+    if (ended || timer !== undefined) return;
+    // Fixed deadline, not an idle debounce: redraws must not postpone inspection forever.
+    timer = setTimer(() => {
+      timer = undefined;
+      if (ended) return;
+      if (writing) {schedule(); return;}
+      try {inspect();} catch (err) {onError(err);}
+    }, 250);
+  }
   return {
     feed(chunk) {
       if (ended) return;
-      generation++; const current = generation;
-      clearTimer(timer); writing++;
+      writing++;
       screen.write(chunk, () => {
         writing--;
-        if (!ended && current === generation) schedule();
+        if (!ended) {
+          // Observe prompt disappearance even when the next identical prompt arrives
+          // before the deadline. Only an intact menu can be approved by inspect().
+          const text = snapshot();
+          if (text.trim() && !/Would you like to|Allow command\?|Yes, proceed|No, and tell Codex/.test(text)) last = '';
+          schedule();
+        }
       });
     },
     input(data) {
@@ -32,7 +64,7 @@ function createSession({child, settings, cols, rows, log, onError = err => {thro
       // Ctrl+] is reserved by the wrapper. Everything else, including Ctrl+C, is forwarded.
       for (const part of data.split(/(\x1d)/)) {
         if (part === '\x1d') {
-          settings.enabled = !settings.enabled; last = ''; clearTimer(timer);
+          settings.enabled = !settings.enabled; last = ''; clearTimer(timer); timer = undefined;
           log('MODE', settings.enabled ? 'ON' : 'OFF');
           if (settings.enabled) schedule();
         } else if (part) child.write(part);
@@ -40,8 +72,8 @@ function createSession({child, settings, cols, rows, log, onError = err => {thro
     },
     resize(cols, rows) {
       if (ended) return;
-      clearTimer(timer); generation++;
-      child.resize(cols, rows); screen.resize(cols, rows); last = ''; schedule();
+      clearTimer(timer); timer = undefined;
+      child.resize(cols, rows); screen.resize(cols, rows); schedule();
     },
     stop() { if (ended) return; ended = true; clearTimer(timer); screen.dispose(); }
   };

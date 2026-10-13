@@ -5,7 +5,7 @@ const os = require('node:os');
 const {parse, settings: loadSettings} = require('../lib/options');
 const {resolveCodex} = require('../lib/resolve');
 const {createSession} = require('../lib/session');
-const HELP = `Codex Auto-Accept CLI 0.1.0
+const HELP = `Codex Auto-Accept CLI 0.1.1
 Usage: codex-auto [wrapper options] -- [Codex arguments]
   --auto          Start auto-accept ON (default OFF)
   --off           Start OFF, overriding config

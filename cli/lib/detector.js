@@ -16,10 +16,10 @@ function detect(screen, settings) {
       !/^\s*\d+\. No, and tell Codex what to do differently \(esc\)\s*$/m.test(block) ||
       !/Press enter to confirm or esc to cancel\s*$/.test(block)) return null;
   const file = /make the following edits|apply these changes/.test(lines[q]);
-  if (file && !settings.approveFileChanges) return {allow: false, reason: 'file approvals disabled', identity: block};
+  if (file && !settings.approveFileChanges) return {allow: false, reason: 'file approvals disabled', identity: block.replace(/\s+/g, ' ').trim()};
   if (!file && !/^\s*\$\s+\S/m.test(block)) return null;
   // Truncated commands could hide denied text: leave those for manual review.
-  if (/[…]|\.{3}|\bctrl\+o\b|command.*clipped/i.test(block)) return {allow: false, reason: 'clipped content', identity: block};
-  return {...evaluate(block, settings), identity: block, key: 'y'};
+  if (/[…]|\.{3}|\bctrl\+o\b|command.*clipped/i.test(block)) return {allow: false, reason: 'clipped content', identity: block.replace(/\s+/g, ' ').trim()};
+  return {...evaluate(block, settings), identity: block.replace(/\s+/g, ' ').trim(), key: 'y'};
 }
 module.exports = {isCodexCommand, detect};
