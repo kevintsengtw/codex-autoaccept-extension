@@ -1,4 +1,4 @@
-# Codex Auto-Accept CLI — Windows 測試版 0.1.13
+# Codex Auto-Accept CLI — Windows 測試版 0.1.14
 
 在 Windows Terminal 內透過 ConPTY 啟動 Codex，辨識完整英文核准選單後送出單次 `y`。與 VS Code 擴充套件分開運作，不需要 VS Code，也不修改 Codex config、sandbox 或企業 managed requirements。
 
@@ -6,8 +6,8 @@
 
 條件：Windows 11 或支援 ConPTY 的 Windows 10（1903／build 18362 以上），**原生 Windows Node.js 22／24，x64 或 ARM64**，以及已可執行的 Codex CLI。此套件不是獨立 EXE，不包含 Node.js 或 Codex。
 
-1. 解壓縮 `codex-autoaccept-cli-windows-0.1.13.zip`。
-2. Windows Terminal 開啟 PowerShell，進入解壓縮的 `codex-autoaccept-cli-0.1.13` 資料夾。
+1. 解壓縮 `codex-autoaccept-cli-windows-0.1.14.zip`。
+2. Windows Terminal 開啟 PowerShell，進入解壓縮的 `codex-autoaccept-cli-0.1.14` 資料夾。
 3. 檢查環境並跑自我測試：
 
 ```powershell
@@ -34,13 +34,13 @@ npm.cmd ci
 
 ```powershell
 cd C:\work\my-project
-& 'C:\tools\codex-autoaccept-cli-0.1.13\codex-auto.cmd' --auto
+& 'C:\tools\codex-autoaccept-cli-0.1.14\codex-auto.cmd' --auto
 ```
 
 請將上面工具路徑改為你的解壓縮位置。所有 Codex 參數放在 `--` 後面：
 
 ```powershell
-& 'C:\tools\codex-autoaccept-cli-0.1.13\codex-auto.cmd' --auto -- resume
+& 'C:\tools\codex-autoaccept-cli-0.1.14\codex-auto.cmd' --auto -- resume
 ```
 
 預設 OFF；只有 `--auto` 或指定 config 裡的 `enabled: true` 會開啟。執行中按 **Ctrl+]** 切換 ON／OFF，終端機會顯示目前模式。`Ctrl+C`、方向鍵、貼上與一般輸入會轉送給 Codex；`Ctrl+]` 為包裝器保留熱鍵。如果鍵盤配置無法送出 Ctrl+]，可退出後用 `--auto` / `--off` 重啟。
@@ -48,7 +48,7 @@ cd C:\work\my-project
 建議首次真實 Codex 測試先使用 dry run：
 
 ```powershell
-& 'C:\tools\codex-autoaccept-cli-0.1.13\codex-auto.cmd' --auto --dry-run
+& 'C:\tools\codex-autoaccept-cli-0.1.14\codex-auto.cmd' --auto --dry-run
 ```
 
 dry run 只記錄可辨識的提示，不會自動送鍵；仍可手動確認。按 Ctrl+] 也不會解除 dry run。
@@ -58,7 +58,7 @@ dry run 只記錄可辨識的提示，不會自動送鍵；仍可手動確認。
 設定只從你明確傳入的檔案載入，不會從專案自動搜尋：
 
 ```powershell
-& 'C:\tools\codex-autoaccept-cli-0.1.13\codex-auto.cmd' --config 'C:\tools\codex-autoaccept-cli-0.1.13\config.example.json' --auto
+& 'C:\tools\codex-autoaccept-cli-0.1.14\codex-auto.cmd' --config 'C:\tools\codex-autoaccept-cli-0.1.14\config.example.json' --auto
 ```
 
 JSON 支援 `enabled`、`dryRun`、`approveFileChanges`、`expandLongCommands`、`logMaxBytes`、`logBackupCount`、`allowPatterns`、`denyPatterns`。規則是 JavaScript regex，不是 glob；無效 JSON、型別或 regex 會在啟動 Codex 前拒絕啟動。變更檔案後需重新啟動；Ctrl+] 的狀態不會寫回檔案。
@@ -128,6 +128,20 @@ Get-Content "$env:LOCALAPPDATA\CodexAutoAccept\cli.log" -Tail 20 -Wait
 ## 0.1.5：移除互動畫面的自動診斷輸出
 
 不再把 MANUAL／UNRECOGNIZED 寫入正在使用的 Codex terminal，以免診斷占用畫面、干擾 TUI 或讓使用者誤判操作狀態。所有自動決策與辨識診斷只寫入 cli.log；啟動資訊、使用者 Ctrl+] 切換回饋及終止錯誤仍會顯示。保留 0.1.4 的標題重繪修正。
+
+## 0.1.14：分頁辨識與中斷診斷
+
+針對 `EXPAND open ...` 後沒有任何 `read page`、最後出現 `unrecognized EXEC viewer or response timeout` 的回報，加入以下修正：
+
+- EXEC 標題前可有空白列；有不明文字時仍不自動操作。
+- 使用最下面的百分比分隔線，避免命令文字中相似的分隔線干擾內容讀取。
+- 首次等待完整檢視器從 3 秒延長到 8 秒；整次掃描仍受 20 秒上限約束。
+- 完整的終端焦點通知不再當成使用者輸入而取消掃描；通知仍原樣轉送。真正的鍵盤輸入、貼上或混合輸入仍會取消。分段收到的不完整通知仍採原本保守處理。
+- log 分別指出缺少 EXEC 標題、百分比分隔線、pgup/pgdn 或 q close 提示，附上行列數與標題列索引；不記錄命令、路徑或畫面文字，也不輸出到 Codex 互動畫面。
+
+65 項本機測試通過。這些改動修復已重現的情況，但目前沒有失敗當時的分頁畫面，尚不能確認公司環境每次中斷的根因。若仍卡住，回報最新版 START 與同一時間的 EXPAND／MANUAL 紀錄即可；不需要提供公司命令全文。未知或不完整畫面仍保留人工處理，不會盲目送出 q 或 y。
+
+格式核對來源：[Codex 0.162.1 分頁檢視器](https://github.com/openai/codex/blob/rust-v0.162.1/codex-rs/tui/src/pager_overlay.rs)。保留前版的變數誤判修正、可見區域修復與 log 輪替。
 
 ## 0.1.13：B001 不再把 PowerShell 變數當成刪除命令
 

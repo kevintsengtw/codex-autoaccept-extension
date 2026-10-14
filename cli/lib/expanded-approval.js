@@ -18,17 +18,26 @@ function candidate(text) {
   if (!hint || hint.index > block.search(/^\s*[›❯>]?\s*1\. Yes, proceed \(y\)\s*$/m)) return null;
   return {identity: compact(block), block, cropped: !match};
 }
-function pager(text) {
+function inspectPager(text) {
   const lines = text.split('\n').map(line => line.trimEnd());
-  if (!/^\s*\/\s*E\s*X\s*E\s*C\s*(?:\/\s*)*$/.test(lines[0] ?? '')) return null;
-  const bar = lines.findIndex(line => /^[─━-]+\s*\d{1,3}%\s*[─━-]*\s*$/.test(line));
-  if (bar < 2) return null;
+  const header = /^\s*\/\s*E\s*X\s*E\s*C\s*(?:\/\s*)*$/;
+  const first = lines.findIndex(line => line.trim());
+  if (!header.test(lines[first] ?? '')) {
+    return {reason:`missing EXEC header at viewport top; headerRow=${lines.findIndex(line=>header.test(line))}`};
+  }
+  // Only blank padding can precede the verified header. Select the bottom
+  // separator, not a similar-looking line within a script's displayed text.
+  const bar = lines.findLastIndex(line => /^[─━-]+\s*\d{1,3}%\s*[─━-]*\s*$/.test(line));
+  if (bar < first + 2) return {reason:'missing complete percentage separator'};
   const hints = lines.slice(bar + 1).join('\n');
-  if (!/pgup\/pgdn to page/i.test(hints) || !/^\s*q close\s*$/m.test(hints)) return null;
+  if (!/pgup\/pgdn to page/i.test(hints)) return {reason:'missing complete pgup/pgdn hint'};
+  if (!/^\s*q close\s*$/m.test(hints)) return {reason:'missing complete q close hint'};
   const percent = Number(lines[bar].match(/(\d+)%/)[1]);
-  if (percent > 100) return null;
-  return {rows: lines.slice(1, bar), percent, signature: compact(text)};
+  if (percent > 100) return {reason:'invalid pager percentage'};
+  return {frame:{rows: lines.slice(first + 1, bar), percent, signature: compact(text)}};
 }
+function pager(text) {return inspectPager(text).frame ?? null;}
+function diagnosePager(text) {return inspectPager(text).reason ?? '';}
 function overlap(previous, current) {
   const matches = [];
   for (let n = 1; n < current.length; n++) {
@@ -50,7 +59,7 @@ function createExpandedApproval({child, settings, log, now = Date.now}) {
     child.write('q');
     state.phase = 'return'; state.since = now();
   }
-  function inspect({logical, physical}) {
+  function inspect({logical, physical, cols, rows}) {
     if (!state) {
       if (!settings.enabled || settings.dryRun || !settings.expandLongCommands) return null;
       const origin = candidate(logical) ?? candidate(physical);
@@ -87,7 +96,12 @@ function createExpandedApproval({child, settings, log, now = Date.now}) {
     }
     const frame = pager(physical);
     if (!frame) {
-      if (now() - state.since > 3000) return finish('unrecognized EXEC viewer or response timeout');
+      const reason = `${diagnosePager(physical)}; terminal=${cols ?? '?'}x${rows ?? '?'}`;
+      if (reason !== state.viewerDiagnostic) {
+        log('EXPAND', `waiting for complete viewer; ${reason}`);
+        state.viewerDiagnostic = reason;
+      }
+      if (now() - state.since > 8000) return finish(`unrecognized EXEC viewer or response timeout; ${reason}`);
       return {handled: true, active: true};
     }
     if (frame.signature === state.signature) {
@@ -153,4 +167,4 @@ function createExpandedApproval({child, settings, log, now = Date.now}) {
   }
   return {inspect, cancel(reason) { if (state) finish(reason); }, get active() {return !!state;}};
 }
-module.exports = {createExpandedApproval, candidate, pager};
+module.exports = {createExpandedApproval, candidate, pager, diagnosePager};

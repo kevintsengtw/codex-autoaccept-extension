@@ -20,7 +20,7 @@ function createSession({child, settings, cols, rows, log, onError = err => {thro
       if (line.isWrapped && lines.length && !boundary) lines[lines.length - 1] += text;
       else lines.push(text);
     }
-    return {logical: lines.join('\n').trimEnd(), physical: physical.join('\n').trimEnd()};
+    return {logical: lines.join('\n').trimEnd(), physical: physical.join('\n').trimEnd(), cols:screen.cols, rows:screen.rows};
   }
   function inspect() {
     if (ended || writing || !settings.enabled) return;
@@ -81,7 +81,9 @@ function createSession({child, settings, cols, rows, log, onError = err => {thro
     },
     input(data) {
       if (ended) return;
-      expanded.cancel('user input; automatic scan stopped');
+      // Focus reports are terminal notifications, not a user's approval edit.
+      // Forward them unchanged but do not cancel an active scan for them alone.
+      if (data.replace(/\x1b\[[IO]/g, '')) expanded.cancel('user input; automatic scan stopped');
       // Ctrl+] is reserved by the wrapper. Everything else, including Ctrl+C, is forwarded.
       for (const part of data.split(/(\x1d)/)) {
         if (part === '\x1d') {

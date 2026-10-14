@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const {createExpandedApproval, candidate, pager} = require('../lib/expanded-approval');
+const {createExpandedApproval, candidate, pager, diagnosePager} = require('../lib/expanded-approval');
 const modal = cmd => `Would you like to run the following command?\nReason: long script\n $ ${cmd}\n[\u2026 30 lines] ctrl+a view all\n› 1. Yes, proceed (y)\n 2. No, and tell Codex what to do differently (esc)\nPress enter to confirm or esc to cancel`;
 const view = (rows, pct=100, title='E X E C') => `/ ${title} / / /\n${rows.join('\n')}\n──────── ${pct}% ─\n ↑/↓ to scroll · pgup/pgdn to page · home/end to jump\n q close`;
 function fixture(extra={}) {
@@ -110,4 +110,32 @@ test('expanded JSON query using rd variable passes but actual deletion remains m
   const g=fixture();g.feed(origin);g.feed(view(['$rd = 1; rd /s /q example']));g.feed(origin);
   assert.equal(g.writes.includes('y'),false);
   assert.equal(g.logs.at(-1)[1],'expanded approval: deny rule; rules=B001:windows-file-delete');
+});
+test('pager accepts blank padding but not a nonblank unknown header or remapped close key',()=>{
+  assert.deepEqual(pager('\n\n'+view(['echo hi'])).rows,['echo hi']);
+  assert.equal(pager('unknown banner\n'+view(['echo hi'])),null);
+  assert.equal(pager(view(['echo hi']).replace('q close','esc close')),null);
+});
+test('last percentage separator preserves script rows that resemble pager chrome',()=>{
+  const text=view(['echo hi','──── 50% ─','Remove-Item example']);
+  assert.deepEqual(pager(text).rows,['echo hi','──── 50% ─','Remove-Item example']);
+  const f=fixture(),origin=modal('echo shown');f.feed(origin);f.feed(text);f.feed(origin);
+  assert.equal(f.writes.includes('y'),false);
+});
+test('slow initial viewer can complete after three seconds but unknown viewer expires privately',()=>{
+  const origin=modal('echo shown'),f=fixture();f.feed(origin);f.advance(4000);
+  f.feed('still rendering');assert.deepEqual(f.writes,['\x01']);
+  f.feed(view(['echo complete']));f.feed(origin);assert.equal(f.writes.at(-1),'y');
+  const g=fixture();g.feed(origin);g.advance(8100);
+  g.feed(view(['PRIVATE_COMMAND_PATH'],100,'P A T C H'));
+  assert.deepEqual(g.writes,['\x01']);
+  assert.ok(g.logs.at(-1)[1].includes('missing EXEC header'));
+  assert.equal(JSON.stringify(g.logs).includes('PRIVATE_COMMAND_PATH'),false);
+});
+test('pager diagnostics identify each structural boundary without command content',()=>{
+  const text=view(['PRIVATE_COMMAND_PATH']);
+  assert.equal(diagnosePager(text),'');
+  assert.ok(diagnosePager(text.replace('100%','percent')).includes('percentage separator'));
+  assert.ok(diagnosePager(text.replace('pgup/pgdn','unknown')).includes('pgup/pgdn'));
+  assert.ok(diagnosePager(text.replace('q close','unknown')).includes('q close'));
 });

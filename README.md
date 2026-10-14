@@ -13,7 +13,7 @@
 | 成品 | 版本 | 用途 |
 | --- | --- | --- |
 | [codex-autoaccept-0.1.1.vsix](artifacts/codex-autoaccept-0.1.1.vsix) | 0.1.1 | VS Code 擴充套件 |
-| [codex-autoaccept-cli-windows-0.1.13.zip](artifacts/codex-autoaccept-cli-windows-0.1.13.zip) | 0.1.13 | Windows Terminal 獨立 CLI 測試版 |
+| [codex-autoaccept-cli-windows-0.1.14.zip](artifacts/codex-autoaccept-cli-windows-0.1.14.zip) | 0.1.14 | Windows Terminal 獨立 CLI 測試版 |
 | [codex-uia-probe-windows-0.2.1.zip](artifacts/codex-uia-probe-windows-0.2.1.zip) | 0.2.1 | Windows 桌面 App：UIA 探測、手動單次與控制台 ON／OFF 工具；[操作指南](docs/CODEX_UIA_PROBE_WINDOWS.md) |
 | [SHA256SUMS](artifacts/SHA256SUMS) | — | 成品雜湊值 |
 
@@ -166,12 +166,14 @@ CLI 目前只辨識官方**英文完整核准選單**，包含 `Yes, proceed (y)
 
 ## Windows Terminal 獨立 CLI 包裝器
 
+0.1.14 加強展開分頁辨識與等待，修正完整焦點通知造成掃描取消的問題，並加入不含命令內容的分項診斷。公司環境的分頁中斷根因仍待新版 log 確認；完整變更與已知限制見 [CLI README](cli/README.md)。
+
 此成品為 **Windows 測試版**，不需要 VS Code，不必安裝 GUI 整合。需要支援 ConPTY 的 Windows 10 1903／build 18362 以上或 Windows 11、原生 Windows Node.js 22／24（x64／ARM64），以及已可使用的 Codex CLI。ZIP 含 Windows 原生依賴，**不包含 Node.js 或 Codex**。
 
 ### 安裝與自我測試
 
-1. 解壓縮 `codex-autoaccept-cli-windows-0.1.13.zip`。
-2. Windows Terminal 開啟 PowerShell，進入解壓縮後的 `codex-autoaccept-cli-0.1.13` 目錄。
+1. 解壓縮 `codex-autoaccept-cli-windows-0.1.14.zip`。
+2. Windows Terminal 開啟 PowerShell，進入解壓縮後的 `codex-autoaccept-cli-0.1.14` 目錄。
 3. 執行：
 
    ```powershell
@@ -190,7 +192,7 @@ ZIP 已含 npm 提供的 Windows x64／ARM64 `node-pty` 依賴，正常解壓後
 
 ```powershell
 cd C:\work\my-project
-& 'C:\tools\codex-autoaccept-cli-0.1.13\codex-auto.cmd' --auto
+& 'C:\tools\codex-autoaccept-cli-0.1.14\codex-auto.cmd' --auto
 ```
 
 請將路徑換成你的解壓縮位置。預設 OFF，`--auto` 開啟，`--off` 關閉；執行中 **Ctrl+]** 切換，狀態不寫回 config。若鍵盤無法送出熱鍵，退出後以啟動參數切換。
@@ -198,13 +200,13 @@ cd C:\work\my-project
 Codex 自己的參數必須放在 `--` 後：
 
 ```powershell
-& 'C:\tools\codex-autoaccept-cli-0.1.13\codex-auto.cmd' --auto -- resume
+& 'C:\tools\codex-autoaccept-cli-0.1.14\codex-auto.cmd' --auto -- resume
 ```
 
 首次真實測試建議 dry run：
 
 ```powershell
-& 'C:\tools\codex-autoaccept-cli-0.1.13\codex-auto.cmd' --auto --dry-run
+& 'C:\tools\codex-autoaccept-cli-0.1.14\codex-auto.cmd' --auto --dry-run
 ```
 
 `--dry-run` 只記錄，不送鍵；Ctrl+] 不會解除 dry run。一般輸入、Ctrl+C、貼上和方向鍵轉送給 Codex。
@@ -282,7 +284,7 @@ CLI ZIP 打包腳本需要 Python 3，成品會包含 npm 提供的 Windows 原�
 | `docs/` | 驗證紀錄 |
 | `artifacts/` | 已打包 VSIX、Windows ZIP 及 checksum |
 
-0.1.1 修正開關寫入與刷新、快速連點、失敗回報，並保留錯誤設定下的使用者開關意圖；自動核准仍暫停至設定修正。Windows CLI 測試版為 0.1.13，修正 B001 把 `$rd` 等 PowerShell 變數當成刪除命令的誤判，真正的刪除命令仍保留人工確認。包含小可見區域展開修復與 B004 工具清單誤判修正，公司 Windows 最新案例實測待確認。log 預設每檔 5 MiB、3 份備份，總量約 20 MiB，舊大檔會保留近期完整紀錄後縮減。拒絕紀錄包含規則 ID／類別，回報時不需要命令全文；設定與分類表見 [CLI README](cli/README.md)。
+0.1.1 修正開關寫入與刷新、快速連點、失敗回報，並保留錯誤設定下的使用者開關意圖；自動核准仍暫停至設定修正。Windows CLI 測試版為 0.1.14，修正 B001 把 `$rd` 等 PowerShell 變數當成刪除命令的誤判，真正的刪除命令仍保留人工確認。包含小可見區域展開修復與 B004 工具清單誤判修正，公司 Windows 最新案例實測待確認。log 預設每檔 5 MiB、3 份備份，總量約 20 MiB，舊大檔會保留近期完整紀錄後縮減。拒絕紀錄包含規則 ID／類別，回報時不需要命令全文；設定與分類表見 [CLI README](cli/README.md)。
 
 ## 參考來源與授權
 

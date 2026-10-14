@@ -61,6 +61,21 @@ test('PowerShell rd variable approval succeeds but actual rd command still stays
   await sleep(330);assert.deepEqual(sent,['y']);
   assert.ok(logs.some(x=>x[0]==='MANUAL'&&x[1].includes('B001:windows-file-delete')));
 });
+test('terminal focus notifications are forwarded without cancelling expanded approval',async t=>{
+  const {s,sent}=session(t);
+  const origin=prompt('echo shown\r\n[\u2026 30 lines] ctrl+a view all');
+  s.feed(origin);await sleep(330);assert.deepEqual(sent,['\x01']);
+  s.input('\x1b[O');s.input('\x1b[I');
+  s.feed('\x1b[2J\x1b[H\r\n/ E X E C / / /\r\necho complete\r\n──────── 100% ─\r\n pgup/pgdn to page\r\n q close');
+  await sleep(330);assert.deepEqual(sent,['\x01','\x1b[O','\x1b[I','q']);
+  s.feed('\x1b[2J\x1b[H'+origin);await sleep(330);assert.equal(sent.at(-1),'y');
+});
+test('real user input alongside a focus report still cancels expanded approval',async t=>{
+  const {s,sent,logs}=session(t);
+  s.feed(prompt('echo shown\r\n[\u2026 30 lines] ctrl+a view all'));await sleep(330);
+  s.input('\x1b[Iq');assert.deepEqual(sent,['\x01','\x1b[Iq']);
+  assert.ok(logs.some(x=>x[0]==='MANUAL'&&x[1].includes('user input')));
+});
 test('normal-font small viewports recover long Reason overflow through full EXEC review without resize',async t=>{
   for(const [cols,rows] of [[80,24],[60,18],[120,30]]){
     const sent=[],logs=[];
