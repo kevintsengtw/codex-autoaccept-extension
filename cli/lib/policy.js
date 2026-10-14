@@ -17,6 +17,11 @@ const RULE_CATEGORIES = [
   'git-destructive', 'destructive-sql', 'system-operation', 'raw-disk-write',
   'world-writable-permissions', 'remote-script-execution', 'infrastructure-delete'
 ];
+function withoutPowerShellVariables(text) {
+  // B001 lists command aliases (rd, ri, del...), not variable names. Preserve
+  // the original text for all other rules and user-defined patterns.
+  return text.replace(/\$(?:\{(?:[A-Za-z_]\w*:)?[A-Za-z_][\w-]*\}|(?:[A-Za-z_]\w*:)?[A-Za-z_][\w-]*)/g, match => ' '.repeat(match.length));
+}
 function evaluate(text, settings) {
   try {
     const denied = [...BUILTIN_DENY, ...settings.denyPatterns].map((pattern, index) => ({
@@ -27,9 +32,10 @@ function evaluate(text, settings) {
     const allowed = settings.allowPatterns.map(s => new RegExp(s, 'i'));
     const lines = text.split('\n').map(s => s.trim());
     const candidates = [text, lines.join(' '), lines.join('')];
+    const commandCandidates = candidates.map(withoutPowerShellVariables);
     // Only static IDs/categories cross this boundary. Never return patterns,
     // matching text, paths, input snippets or RegExp match objects.
-    const rules = denied.filter(rule => candidates.some(s => rule.re.test(s)))
+    const rules = denied.filter(rule => (rule.id === 'B001' ? commandCandidates : candidates).some(s => rule.re.test(s)))
       .map(({id, category}) => ({id, category}));
     if (rules.length) return {allow: false, reason: 'deny rule', rules};
     if (allowed.length && !allowed.some(re => re.test(text))) return {allow: false, reason: 'not allowlisted'};

@@ -53,6 +53,14 @@ test('tool inventory approval receives one y while recursive rm remains manual',
   await sleep(330);assert.deepEqual(sent,['y']);
   assert.ok(logs.some(entry=>entry[0]==='MANUAL'&&entry[1].includes('B004:recursive-delete')));
 });
+test('PowerShell rd variable approval succeeds but actual rd command still stays manual',async t=>{
+  const {s,sent,logs}=session(t);
+  s.feed(prompt("$rd = Get-Content 'diagnostics.json' -Raw | ConvertFrom-Json; $names = $rd.PSObject.Properties.Name; $names | ConvertTo-Json"));
+  await sleep(330);assert.deepEqual(sent,['y']);
+  s.feed('\x1b[2J\x1b[H'+prompt('$rd = 1; rd /s /q example'));
+  await sleep(330);assert.deepEqual(sent,['y']);
+  assert.ok(logs.some(x=>x[0]==='MANUAL'&&x[1].includes('B001:windows-file-delete')));
+});
 test('normal-font small viewports recover long Reason overflow through full EXEC review without resize',async t=>{
   for(const [cols,rows] of [[80,24],[60,18],[120,30]]){
     const sent=[],logs=[];

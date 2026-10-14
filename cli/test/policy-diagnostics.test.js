@@ -2,6 +2,34 @@ const test=require('node:test');
 const assert=require('node:assert/strict');
 const {evaluate,describe}=require('../lib/policy');
 const config={allowPatterns:[],denyPatterns:[]};
+test('B001 does not mistake PowerShell variable names for delete command aliases',()=>{
+  const query=`$rd = Get-Content -LiteralPath 'diagnostics.json' -Raw | ConvertFrom-Json;
+    $rs = Get-Content -LiteralPath 'summary.json' -Raw | ConvertFrom-Json;
+    $names = $rd.PSObject.Properties.Name;
+    Set-Content -LiteralPath 'report.json' -Value ($names | ConvertTo-Json)`;
+  assert.equal(evaluate(query,config).allow,true);
+  assert.equal(evaluate(`pwsh.exe -Command "${query}"`,config).allow,true);
+  for(const name of ['rd','ri','del','erase','rmdir','Remove-Item']){
+    for(const variable of [`$${name}`,`$script:${name}`,`$global:${name}`,`\u0024{${name}}`,`\u0024{script:${name}}`]){
+      assert.equal(evaluate(`${variable} = 1; Write-Output ${variable}`,config).allow,true,variable);
+    }
+  }
+  assert.deepEqual(evaluate(query,{...config,denyPatterns:['\\$rd\\b']}).rules,
+    [{id:'D001',category:'user-defined'}]);
+});
+test('B001 still rejects delete commands alongside same-named variables',()=>{
+  for(const cmd of ['rd /s /q example','cmd /c del example','ri example','erase example',
+    'rmdir example','Remove-Item -Recurse example','& {Remove-Item example}',
+    'pwsh -Command "$rd = 1; Remove-Item example"', '$rd = 1; rd example',
+    '$ri = 1; & ri example','C:rd example','"C:\\tools\\rmdir.exe" example',
+    '$rd = "Remove-Item"; & $rd example', '${value:-$(rmdir example)}',
+    '$rd = $(Remove-Item example)']){
+    const outcome=evaluate(cmd,config);assert.equal(outcome.allow,false,cmd);
+    assert.ok(outcome.rules.some(rule=>rule.id==='B001'),cmd);
+  }
+  // Excluding B001 variable names must not weaken a different built-in rule.
+  assert.ok(evaluate('$rd = 1; rm -rf example',config).rules.some(rule=>rule.id==='B004'));
+});
 test('tool availability query does not mistake rm.exe and ErrorAction for recursive deletion',()=>{
   const query=`& { @('openfiles.exe', 'handle.exe', 'handle64.exe', 'rm.exe') |
     ForEach-Object { $cmd = Get-Command $_ -ErrorAction SilentlyContinue;

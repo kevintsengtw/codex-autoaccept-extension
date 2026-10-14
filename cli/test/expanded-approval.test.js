@@ -103,3 +103,11 @@ test('cropped recovery requires complete hint, both options and footer before an
   const f=fixture();f.feed(origin);f.feed(view(['echo complete']));
   f.feed(origin.replace('30 lines','31 lines'));assert.equal(f.writes.includes('y'),false);
 });
+test('expanded JSON query using rd variable passes but actual deletion remains manual',()=>{
+  const f=fixture(),origin=modal('echo shown');f.feed(origin);
+  f.feed(view(["$rd = Get-Content 'diagnostics.json' -Raw | ConvertFrom-Json",'$rd.PSObject.Properties.Name | ConvertTo-Json']));
+  f.feed(origin);assert.deepEqual(f.writes,['\x01','q','y']);
+  const g=fixture();g.feed(origin);g.feed(view(['$rd = 1; rd /s /q example']));g.feed(origin);
+  assert.equal(g.writes.includes('y'),false);
+  assert.equal(g.logs.at(-1)[1],'expanded approval: deny rule; rules=B001:windows-file-delete');
+});
