@@ -56,3 +56,11 @@ User 0.1.7 log shows MANUAL clipped content with no EXPAND despite a visible off
 ## 0.1.9 - 2026-10-14
 
 User confirms Windows 0.1.8 expanded approvals succeed for both one- and two-page commands, then supplies a two-page deny-rule result. Full company command cannot be shared. Added stable B001-B011 built-in identifiers and positional D001... custom identifiers, with static categories. All matching rule IDs are included in ordinary and expanded deny logs; no pattern, command, path or match snippet is returned/logged. Matching regexes and allow/deny decisions are unchanged. 40 tests cover classifications, multiple matches, custom-rule privacy and expanded log privacy. Windows metadata-log validation pending.
+
+## 0.1.10 - 2026-10-14
+
+Added CLI-only bounded log rotation: 5 MiB active file plus 3 backups by default, configurable logMaxBytes/logBackupCount. Existing oversized files retain a bounded tail of complete UTF-8 lines. Pruning touches only the selected log and exact numeric backups; other files, desktop logs and UIA reports are not managed here. Short-lived locks coordinate cooperating CLI processes; confirmed exited owners can be recovered, unverified locks fail rather than overwrite. Approval and expansion rules are unchanged.
+
+49 tests cover retention, oversized legacy files, UTF-8 boundaries, reduced/zero backups, unrelated files, unsafe targets, parallel processes, stale-lock recovery and validation. Windows live filesystem validation pending. Existing successful 0.1.9 Windows approval behavior remains the baseline; the new manager is not yet claimed verified there.
+
+Local macOS real PTY expanded self-test passed using a temporary prefilled oversized log and a 64 KiB limit. Existing log rotated into .1, both files stayed within limit, and the final ACCEPT record was present. No normal-profile log was changed by this test.

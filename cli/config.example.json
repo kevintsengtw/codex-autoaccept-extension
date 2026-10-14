@@ -3,6 +3,8 @@
   "dryRun": false,
   "approveFileChanges": true,
   "expandLongCommands": true,
+  "logMaxBytes": 5242880,
+  "logBackupCount": 3,
   "allowPatterns": [],
   "denyPatterns": [
     "\\b(Remove-Item|ri|del|erase|rmdir|rd)\\b",

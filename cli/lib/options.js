@@ -1,5 +1,5 @@
 const fs = require('node:fs');
-const DEFAULTS = {enabled: false, dryRun: false, approveFileChanges: true, expandLongCommands: true, allowPatterns: [], denyPatterns: []};
+const DEFAULTS = {enabled: false, dryRun: false, approveFileChanges: true, expandLongCommands: true, logMaxBytes: 5 * 1024 * 1024, logBackupCount: 3, allowPatterns: [], denyPatterns: []};
 function parse(args) {
   const options = {codexArgs: []};
   for (let i = 0; i < args.length; i++) {
@@ -26,6 +26,8 @@ function settings(options) {
     if (!Array.isArray(result[key]) || result[key].some(x => typeof x !== 'string')) throw Error(`Invalid ${key}: expected string array`);
     for (const pattern of result[key]) new RegExp(pattern, 'i');
   }
+  if (!Number.isInteger(result.logMaxBytes) || result.logMaxBytes < 65536 || result.logMaxBytes > 104857600) throw Error('Invalid logMaxBytes: expected 65536..104857600');
+  if (!Number.isInteger(result.logBackupCount) || result.logBackupCount < 0 || result.logBackupCount > 20) throw Error('Invalid logBackupCount: expected 0..20');
   if (options.enabled !== undefined) result.enabled = options.enabled;
   if (options.dryRun) result.dryRun = true;
   return result;
