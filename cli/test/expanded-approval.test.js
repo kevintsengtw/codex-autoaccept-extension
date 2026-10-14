@@ -72,3 +72,12 @@ test('ellipsis without explicit expansion hint, remapped shortcut and missing ap
     const f=fixture();f.feed(changed);assert.deepEqual(f.writes,[]);
   }
 });
+test('expanded-command deny logs carry rule IDs but no private command text',()=>{
+  const f=fixture(),origin=modal('echo shown'),secret='C:\\PRIVATE_COMPANY_PATH';
+  f.feed(origin);f.feed(view([`Remove-Item -Recurse "${secret}"`]));f.feed(origin);
+  assert.equal(f.writes.includes('y'),false);
+  assert.equal(f.logs.at(-1)[1],'expanded approval: deny rule; rules=B001:windows-file-delete');
+  const serialized=JSON.stringify(f.logs);
+  assert.equal(serialized.includes(secret),false);
+  assert.equal(serialized.includes('Remove-Item'),false);
+});

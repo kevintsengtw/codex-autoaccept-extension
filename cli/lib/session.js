@@ -1,6 +1,7 @@
 const {Terminal} = require('@xterm/headless');
 const {detect, diagnose} = require('./detector');
 const {createExpandedApproval} = require('./expanded-approval');
+const {describe} = require('./policy');
 function createSession({child, settings, cols, rows, log, onError = err => {throw err;}, setTimer = setTimeout, clearTimer = clearTimeout}) {
   const screen = new Terminal({cols, rows, scrollback: 0, allowProposedApi: true});
   let ended = false, timer, last = '', diagnostic = '', writing = 0;
@@ -48,7 +49,7 @@ function createSession({child, settings, cols, rows, log, onError = err => {thro
     result.identity = result.identity.replace(/\s+/g, '');
     if (last === result.identity) return;
     last = result.identity;
-    if (!result.allow || !('key' in result)) { log('MANUAL', result.reason); return; }
+    if (!result.allow || !('key' in result)) { log('MANUAL', describe(result)); return; }
     if (settings.dryRun) { log('DRY_RUN', 'would approve once'); return; }
     log('ACCEPT', fallback ? 'once; physical-row fallback' : 'once');
     child.write(result.key);

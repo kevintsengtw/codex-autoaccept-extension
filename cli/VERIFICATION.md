@@ -52,3 +52,7 @@ Official source reviewed: openai/codex codex-rs/tui/src/app/event_dispatch.rs (F
 ## 0.1.8 - 2026-10-14
 
 User 0.1.7 log shows MANUAL clipped content with no EXPAND despite a visible official view-all hint. Verified ListSelectionView renders "[ellipsis N lines] ctrl+a view all" while the original candidate required +N lines. Fixed recognition and replaced the default test/self-test hint with the official bracketed form. Added ASCII-ellipsis, separator, absent-hint and remapped-key cases. Old 0.1.7 fails the exact official-format regression; updated recognition passes. 36 tests and real macOS PTY expanded test pass. Windows viewer compatibility still pending. This corrects an implementation and fixture error, not a newly assumed root cause.
+
+## 0.1.9 - 2026-10-14
+
+User confirms Windows 0.1.8 expanded approvals succeed for both one- and two-page commands, then supplies a two-page deny-rule result. Full company command cannot be shared. Added stable B001-B011 built-in identifiers and positional D001... custom identifiers, with static categories. All matching rule IDs are included in ordinary and expanded deny logs; no pattern, command, path or match snippet is returned/logged. Matching regexes and allow/deny decisions are unchanged. 40 tests cover classifications, multiple matches, custom-rule privacy and expanded log privacy. Windows metadata-log validation pending.

@@ -1,4 +1,4 @@
-const {evaluate} = require('./policy');
+const {evaluate, describe} = require('./policy');
 const {detect} = require('./detector');
 const compact = text => text.replace(/\s+/g, '');
 function candidate(text) {
@@ -69,7 +69,7 @@ function createExpandedApproval({child, settings, log, now = Date.now}) {
         const {outcome, origin} = state;
         state = null;
         if (!outcome?.allow) {
-          log('MANUAL', `expanded approval: ${outcome?.reason ?? 'incomplete content'}`);
+          log('MANUAL', `expanded approval: ${outcome ? describe(outcome) : 'incomplete content'}`);
           return {handled: true, identity: origin.identity};
         }
         log('ACCEPT', 'once; full expanded command reviewed');
@@ -140,7 +140,7 @@ function createExpandedApproval({child, settings, log, now = Date.now}) {
       while (state.rows.at(-1)?.trim() === '~') state.rows.pop();
       const command = state.rows.join('\n').trim();
       state.outcome = command ? evaluate(command, settings) : {allow: false, reason: 'empty expanded command'};
-      close(frame, state.outcome.allow ? 'complete command passed rules; return' : `full command manual: ${state.outcome.reason}`);
+      close(frame, state.outcome.allow ? 'complete command passed rules; return' : `full command manual: ${describe(state.outcome)}`);
     } else {
       state.previous = frame; state.signature = frame.signature; state.since = now();
       child.write('\x1b[6~');

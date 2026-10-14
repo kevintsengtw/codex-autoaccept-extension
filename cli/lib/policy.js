@@ -10,15 +10,32 @@ const BUILTIN_DENY = [
   '\\b(curl|wget)\\b[^|]*\\|\\s*(sudo\\s+)?(sh|bash|zsh|python\\d*|node|perl|ruby)\\b',
   '\\b(terraform\\s+destroy|kubectl\\s+delete|docker\\s+(system|volume)\\s+prune)\\b'
 ];
+const RULE_CATEGORIES = [
+  'windows-file-delete', 'disk-format', 'dynamic-execution', 'recursive-delete',
+  'git-destructive', 'destructive-sql', 'system-operation', 'raw-disk-write',
+  'world-writable-permissions', 'remote-script-execution', 'infrastructure-delete'
+];
 function evaluate(text, settings) {
   try {
-    const denied = [...BUILTIN_DENY, ...settings.denyPatterns].map(s => new RegExp(s, 'i'));
+    const denied = [...BUILTIN_DENY, ...settings.denyPatterns].map((pattern, index) => ({
+      re: new RegExp(pattern, 'i'),
+      id: index < BUILTIN_DENY.length ? `B${String(index + 1).padStart(3, '0')}` : `D${String(index - BUILTIN_DENY.length + 1).padStart(3, '0')}`,
+      category: index < BUILTIN_DENY.length ? RULE_CATEGORIES[index] : 'user-defined'
+    }));
     const allowed = settings.allowPatterns.map(s => new RegExp(s, 'i'));
     const lines = text.split('\n').map(s => s.trim());
     const candidates = [text, lines.join(' '), lines.join('')];
-    if (denied.some(re => candidates.some(s => re.test(s)))) return {allow: false, reason: 'deny rule'};
+    // Only static IDs/categories cross this boundary. Never return patterns,
+    // matching text, paths, input snippets or RegExp match objects.
+    const rules = denied.filter(rule => candidates.some(s => rule.re.test(s)))
+      .map(({id, category}) => ({id, category}));
+    if (rules.length) return {allow: false, reason: 'deny rule', rules};
     if (allowed.length && !allowed.some(re => re.test(text))) return {allow: false, reason: 'not allowlisted'};
     return {allow: true, reason: 'recognized approval'};
   } catch { return {allow: false, reason: 'invalid regular expression'}; }
 }
-module.exports = {evaluate, BUILTIN_DENY};
+function describe(outcome) {
+  if (!outcome.rules?.length) return outcome.reason;
+  return `${outcome.reason}; rules=${outcome.rules.map(rule => `${rule.id}:${rule.category}`).join(',')}`;
+}
+module.exports = {evaluate, describe, BUILTIN_DENY, RULE_CATEGORIES};
