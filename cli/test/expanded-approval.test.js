@@ -81,3 +81,25 @@ test('expanded-command deny logs carry rule IDs but no private command text',()=
   assert.equal(serialized.includes(secret),false);
   assert.equal(serialized.includes('Remove-Item'),false);
 });
+test('cropped heading and command start can open EXEC but cannot skip full review',()=>{
+  const origin=modal('echo shown').split('\n').slice(3).join('\n');
+  const f=fixture();assert.equal(candidate(origin).cropped,true);
+  f.feed(origin);assert.deepEqual(f.writes,['\x01']);
+  f.feed(view(['echo complete']));assert.deepEqual(f.writes,['\x01','q']);
+  f.feed(origin);assert.deepEqual(f.writes,['\x01','q','y']);
+  const g=fixture();g.feed(origin);g.feed(view(['rm -rf private']));g.feed(origin);
+  assert.equal(g.writes.includes('y'),false);
+  const h=fixture();h.feed(origin);h.advance(3100);h.feed(view(['echo text'],100,'P A T C H'));
+  assert.deepEqual(h.writes,['\x01']);
+});
+test('cropped recovery requires complete hint, both options and footer before any key',()=>{
+  const origin=modal('echo shown').split('\n').slice(3).join('\n');
+  for(const text of [origin.replace('ctrl+a view all',''),origin.replace('ctrl+a','ctrl+o'),
+    origin.replace('Yes, proceed (y)','Continue'),origin.replace('No, and tell Codex what to do differently (esc)','Cancel'),
+    origin.replace('Press enter to confirm or esc to cancel',''),
+    `Would you like to make the following edits?\n${origin}`]){
+    const f=fixture();f.feed(text);assert.deepEqual(f.writes,[],text);
+  }
+  const f=fixture();f.feed(origin);f.feed(view(['echo complete']));
+  f.feed(origin.replace('30 lines','31 lines'));assert.equal(f.writes.includes('y'),false);
+});

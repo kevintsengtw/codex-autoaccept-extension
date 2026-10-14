@@ -13,7 +13,7 @@
 | 成品 | 版本 | 用途 |
 | --- | --- | --- |
 | [codex-autoaccept-0.1.1.vsix](artifacts/codex-autoaccept-0.1.1.vsix) | 0.1.1 | VS Code 擴充套件 |
-| [codex-autoaccept-cli-windows-0.1.11.zip](artifacts/codex-autoaccept-cli-windows-0.1.11.zip) | 0.1.11 | Windows Terminal 獨立 CLI 測試版 |
+| [codex-autoaccept-cli-windows-0.1.12.zip](artifacts/codex-autoaccept-cli-windows-0.1.12.zip) | 0.1.12 | Windows Terminal 獨立 CLI 測試版 |
 | [codex-uia-probe-windows-0.2.1.zip](artifacts/codex-uia-probe-windows-0.2.1.zip) | 0.2.1 | Windows 桌面 App：UIA 探測、手動單次與控制台 ON／OFF 工具；[操作指南](docs/CODEX_UIA_PROBE_WINDOWS.md) |
 | [SHA256SUMS](artifacts/SHA256SUMS) | — | 成品雜湊值 |
 
@@ -170,8 +170,8 @@ CLI 目前只辨識官方**英文完整核准選單**，包含 `Yes, proceed (y)
 
 ### 安裝與自我測試
 
-1. 解壓縮 `codex-autoaccept-cli-windows-0.1.11.zip`。
-2. Windows Terminal 開啟 PowerShell，進入解壓縮後的 `codex-autoaccept-cli-0.1.11` 目錄。
+1. 解壓縮 `codex-autoaccept-cli-windows-0.1.12.zip`。
+2. Windows Terminal 開啟 PowerShell，進入解壓縮後的 `codex-autoaccept-cli-0.1.12` 目錄。
 3. 執行：
 
    ```powershell
@@ -190,7 +190,7 @@ ZIP 已含 npm 提供的 Windows x64／ARM64 `node-pty` 依賴，正常解壓後
 
 ```powershell
 cd C:\work\my-project
-& 'C:\tools\codex-autoaccept-cli-0.1.11\codex-auto.cmd' --auto
+& 'C:\tools\codex-autoaccept-cli-0.1.12\codex-auto.cmd' --auto
 ```
 
 請將路徑換成你的解壓縮位置。預設 OFF，`--auto` 開啟，`--off` 關閉；執行中 **Ctrl+]** 切換，狀態不寫回 config。若鍵盤無法送出熱鍵，退出後以啟動參數切換。
@@ -198,13 +198,13 @@ cd C:\work\my-project
 Codex 自己的參數必須放在 `--` 後：
 
 ```powershell
-& 'C:\tools\codex-autoaccept-cli-0.1.11\codex-auto.cmd' --auto -- resume
+& 'C:\tools\codex-autoaccept-cli-0.1.12\codex-auto.cmd' --auto -- resume
 ```
 
 首次真實測試建議 dry run：
 
 ```powershell
-& 'C:\tools\codex-autoaccept-cli-0.1.11\codex-auto.cmd' --auto --dry-run
+& 'C:\tools\codex-autoaccept-cli-0.1.12\codex-auto.cmd' --auto --dry-run
 ```
 
 `--dry-run` 只記錄，不送鍵；Ctrl+] 不會解除 dry run。一般輸入、Ctrl+C、貼上和方向鍵轉送給 Codex。
@@ -282,7 +282,7 @@ CLI ZIP 打包腳本需要 Python 3，成品會包含 npm 提供的 Windows 原�
 | `docs/` | 驗證紀錄 |
 | `artifacts/` | 已打包 VSIX、Windows ZIP 及 checksum |
 
-0.1.1 修正開關寫入與刷新、快速連點、失敗回報，並保留錯誤設定下的使用者開關意圖；自動核准仍暫停至設定修正。Windows CLI 測試版為 0.1.11，修正工具清單中的 `rm.exe` 與 PowerShell `-ErrorAction` 造成 B004 誤判，實際遞迴刪除仍保留人工確認。log 預設每檔 5 MiB、3 份備份，總量約 20 MiB，舊大檔會保留近期完整紀錄後縮減。拒絕紀錄包含規則 ID／類別，回報時不需要命令全文；設定與分類表見 [CLI README](cli/README.md)。
+0.1.1 修正開關寫入與刷新、快速連點、失敗回報，並保留錯誤設定下的使用者開關意圖；自動核准仍暫停至設定修正。Windows CLI 測試版為 0.1.12，修復長說明把核准標題擠出可見區域時，無法啟動完整命令展開的問題；固定小視窗測試不需要縮字或 resize，公司 Windows 實測待確認。包含工具清單中的 `rm.exe` 與 PowerShell `-ErrorAction` 造成 B004 誤判修正，實際遞迴刪除仍保留人工確認。log 預設每檔 5 MiB、3 份備份，總量約 20 MiB，舊大檔會保留近期完整紀錄後縮減。拒絕紀錄包含規則 ID／類別，回報時不需要命令全文；設定與分類表見 [CLI README](cli/README.md)。
 
 ## 參考來源與授權
 

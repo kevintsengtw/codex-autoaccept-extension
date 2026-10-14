@@ -53,6 +53,28 @@ test('tool inventory approval receives one y while recursive rm remains manual',
   await sleep(330);assert.deepEqual(sent,['y']);
   assert.ok(logs.some(entry=>entry[0]==='MANUAL'&&entry[1].includes('B004:recursive-delete')));
 });
+test('normal-font small viewports recover long Reason overflow through full EXEC review without resize',async t=>{
+  for(const [cols,rows] of [[80,24],[60,18],[120,30]]){
+    const sent=[],logs=[];
+    const s=createSession({child:{write:x=>sent.push(x)},settings:{...settings({}),enabled:true},cols,rows,log:(...x)=>logs.push(x)});
+    t.after(()=>s.stop());
+    const origin=`Would you like to run the following command?\r\nReason: ${'long-context '.repeat(400)}\r\n $ echo shown\r\n[\u2026 90 lines] ctrl+a view all\r\n› 1. Yes, proceed (y)\r\n 2. No, and tell Codex what to do differently (esc)\r\nPress enter to confirm or esc to cancel`;
+    const draw=text=>s.feed('\x1b[2J\x1b[H'+text);
+    draw(origin);await sleep(330);assert.deepEqual(sent,['\x01'],`${cols}x${rows}`);
+    assert.ok(logs.some(x=>x[1].includes('heading outside viewport')));
+    const page=content=>`/ E X E C / / /\r\n${content}\r\n${Array(rows-7).fill('~').join('\r\n')}\r\n──────── 100% ─\r\n ↑/↓ to scroll · pgup/pgdn to page · home/end to jump\r\n q close`;
+    draw(page('echo complete'));await sleep(330);assert.deepEqual(sent,['\x01','q']);
+    draw(origin);await sleep(330);assert.deepEqual(sent,['\x01','q','y']);
+    // A later cropped modal must undergo a fresh full review, including deny rules.
+    draw('finished');await sleep(330);
+    draw(origin.replace('90 lines','91 lines'));await sleep(330);
+    draw(page('rm -rf example'));await sleep(330);
+    draw(origin.replace('90 lines','91 lines'));await sleep(330);
+    assert.deepEqual(sent,['\x01','q','y','\x01','q']);
+    assert.ok(logs.some(x=>x[0]==='MANUAL'&&x[1].includes('B004:recursive-delete')));
+    s.stop();
+  }
+});
 test('Ctrl+] toggles; Ctrl+C and other input reach the child',async t=>{
   const {s,sent}=session(t,false);s.feed(prompt('echo hi'));await sleep(330);assert.deepEqual(sent,[]);
   s.input('\x1d');await sleep(330);assert.deepEqual(sent,['y']);

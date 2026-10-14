@@ -4,15 +4,19 @@ const compact = text => text.replace(/\s+/g, '');
 function candidate(text) {
   const heading = /^\s*Would you like to run the following command\?\s*$/m;
   const match = heading.exec(text);
-  if (!match) return null;
-  const block = text.slice(match.index).trim();
+  // Long Reason text can scroll the heading and '$' off the visible viewport.
+  // A complete official view-all hint plus approval menu may open the viewer,
+  // but can never authorize unseen text: EXEC paging and return checks still apply.
+  if (!match && /^\s*(?:Would you like to (?:make the following edits|apply these changes)\?|Allow command\?)\s*$/m.test(text)) return null;
+  const block = (match ? text.slice(match.index) : text).trim();
   if (!/^\s*[›❯>]?\s*1\. Yes, proceed \(y\)\s*$/m.test(block) ||
       !/^\s*\d+\. No, and tell Codex what to do differently \(esc\)\s*$/m.test(block) ||
       !/Press enter to confirm or esc to cancel\s*$/.test(block)) return null;
   // Official ListSelectionView renders "[… N lines] ctrl+a view all".
   // Retain the earlier +N fixture layout, but require the exact view-all shortcut.
-  if (!/(?:\[(?:…|\.{3})\s*\d+\s+lines?\]|\+\s*\d+\s+lines?)\s*(?:[│|·]\s*)?ctrl\+a\s+view all/i.test(block)) return null;
-  return {identity: compact(block), block};
+  const hint = /(?:\[(?:…|\.{3})\s*\d+\s+lines?\]|\+\s*\d+\s+lines?)\s*(?:[│|·]\s*)?ctrl\+a\s+view all/i.exec(block);
+  if (!hint || hint.index > block.search(/^\s*[›❯>]?\s*1\. Yes, proceed \(y\)\s*$/m)) return null;
+  return {identity: compact(block), block, cropped: !match};
 }
 function pager(text) {
   const lines = text.split('\n').map(line => line.trimEnd());
@@ -57,7 +61,7 @@ function createExpandedApproval({child, settings, log, now = Date.now}) {
       if (origin.identity === attempted) return null;
       attempted = origin.identity;
       state = {origin, phase: 'open', since: now(), started: now(), pages: 0, rows: [], previous: null, signature: '', outcome: null};
-      log('EXPAND', 'open explicit Ctrl+A view-all command');
+      log('EXPAND', origin.cropped ? 'open explicit Ctrl+A view-all command; heading outside viewport' : 'open explicit Ctrl+A view-all command');
       child.write('\x01');
       return {handled: true, active: true};
     }
