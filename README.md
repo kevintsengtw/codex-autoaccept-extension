@@ -14,6 +14,7 @@
 | --- | --- | --- |
 | [codex-autoaccept-0.1.1.vsix](artifacts/codex-autoaccept-0.1.1.vsix) | 0.1.1 | VS Code 擴充套件 |
 | [codex-autoaccept-cli-windows-0.1.9.zip](artifacts/codex-autoaccept-cli-windows-0.1.9.zip) | 0.1.9 | Windows Terminal 獨立 CLI 測試版 |
+| [codex-uia-probe-windows-0.2.1.zip](artifacts/codex-uia-probe-windows-0.2.1.zip) | 0.2.1 | Windows 桌面 App：UIA 探測、手動單次與控制台 ON／OFF 工具；[操作指南](docs/CODEX_UIA_PROBE_WINDOWS.md) |
 | [SHA256SUMS](artifacts/SHA256SUMS) | — | 成品雜湊值 |
 
 VS Code 版與 Windows CLI 包裝器分別版本化，兩個開關互不連動。本專案目前使用 VSIX 發佈，**尚未上架 VS Code Marketplace**。
@@ -39,6 +40,20 @@ VS Code 版與 Windows CLI 包裝器分別版本化，兩個開關互不連動�
 使用與更新見 [桌面版說明](desktop-probe/tray/README.md)，紀錄格式見 [log 說明](desktop-probe/LOG_FORMAT.md)，歷史與驗證見 [桌面工具驗證](desktop-probe/VERIFICATION.md)。成品仍附舊探測 CLI 原始碼與工具，日常操作不需要使用。
 
 另一台 Windows 11 可直接 clone／pull 此 repo，依 [Windows 驗證交接](desktop-probe/WINDOWS_HANDOFF.md) 取得 0.3.7 基準、驗證 checksum 並測真實核准；給 Windows Codex Desktop 的 [起始提示詞](desktop-probe/WINDOWS_CODEX_PROMPT.md) 及 [結果模板](desktop-probe/WINDOWS_TEST_RESULTS_TEMPLATE.md) 已整理。Computer Use 是否能操作原生 Windows 視窗，需由該會話的實際工具能力確認；此處沒有宣稱已在 Windows 完成驗證。
+
+## Windows UIA Probe：控制台操作工具
+
+[下載 codex-uia-probe-windows 0.2.1](artifacts/codex-uia-probe-windows-0.2.1.zip)，完整解壓後，從一般權限 PowerShell 進入該目錄：
+
+| 模式 | 執行命令 | 用途 |
+| --- | --- | --- |
+| 唯讀探測 | `.\Run-Probe.cmd` | 檢查 App 的 UIA 控制項，不核准 |
+| 手動單次 | `.\Run-Manual-Once.cmd` | 輸入 INVOKE ONCE 後才核准一次 |
+| 持續 ON／OFF | `.\Run-Auto-Accept.cmd` | 選取 App 視窗；按 O 開啟、F 停用、Q 退出，不需 Enter |
+
+需要 Windows 10／11 與 .NET Framework 4.8／4.8.1，不需 Node.js。自動模式每次啟動預設 OFF；控制台必須保持執行。這不是 VS Code／Codex CLI 工具，也不是上方的系統匣 GUI 版。
+
+完整安裝、選取視窗、參數、報告路徑、摘要、結果判讀及移除方式見 **[codex-uia-probe-windows 操作指南](docs/CODEX_UIA_PROBE_WINDOWS.md)**；進階行為見 [Probe 詳細說明](desktop-probe/README.md)。完整 UIA 報告可能含公司資訊，留在本機即可。
 
 ## VS Code 安裝：Codex 側邊欄
 

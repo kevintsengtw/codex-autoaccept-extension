@@ -1,5 +1,7 @@
 # Codex Windows UIA Probe 0.2.1
 
+下載 `codex-uia-probe-windows` ZIP 後，請先看 **[獨立操作指南](../docs/CODEX_UIA_PROBE_WINDOWS.md)**：包含安裝、三種模式、O／F／Q 操作、報告位置、參數與疑難排解。下文保留進階與歷史驗證細節。
+
 目前 ZIP 主成品為 0.3.7 系統匣版，請先閱讀根目錄 README。0.3.7 桌面畫面已移除診斷區，正常 ON 時自動寫中文 log 與短摘要，參閱 `LOG_FORMAT.md`。完全遮蔽、最小化、鎖定仍未解決。下列保留舊診斷 CLI 說明，日常使用不需操作；系統匣新增的選用「測試背景相容啟動」會只對新 App 程序傳入背景／輔助使用參數，詳見主 README。CLI 不設定這些啟動參數；更新的共享自動核准核心會繼續掃描最小化視窗。
 
 公司 Windows 環境用的唯讀探測工具，目標是確認 ChatGPT Desktop App（Codex）`26.803.81509` 的核准介面是否提供可用的 Windows UI Automation 資訊。這個版本號由使用者提供，不代表工具已在該版本實測。
