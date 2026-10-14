@@ -9,7 +9,9 @@ function candidate(text) {
   if (!/^\s*[›❯>]?\s*1\. Yes, proceed \(y\)\s*$/m.test(block) ||
       !/^\s*\d+\. No, and tell Codex what to do differently \(esc\)\s*$/m.test(block) ||
       !/Press enter to confirm or esc to cancel\s*$/.test(block)) return null;
-  if (!/\+\s*\d+\s+lines?[^\n]*ctrl\+a[^\n]*view all/i.test(block)) return null;
+  // Official ListSelectionView renders "[… N lines] ctrl+a view all".
+  // Retain the earlier +N fixture layout, but require the exact view-all shortcut.
+  if (!/(?:\[(?:…|\.{3})\s*\d+\s+lines?\]|\+\s*\d+\s+lines?)\s*(?:[│|·]\s*)?ctrl\+a\s+view all/i.test(block)) return null;
   return {identity: compact(block), block};
 }
 function pager(text) {

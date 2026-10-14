@@ -1,4 +1,4 @@
-# Codex Auto-Accept CLI — Windows 測試版 0.1.7
+# Codex Auto-Accept CLI — Windows 測試版 0.1.8
 
 在 Windows Terminal 內透過 ConPTY 啟動 Codex，辨識完整英文核准選單後送出單次 `y`。與 VS Code 擴充套件分開運作，不需要 VS Code，也不修改 Codex config、sandbox 或企業 managed requirements。
 
@@ -6,8 +6,8 @@
 
 條件：Windows 11 或支援 ConPTY 的 Windows 10（1903／build 18362 以上），**原生 Windows Node.js 22／24，x64 或 ARM64**，以及已可執行的 Codex CLI。此套件不是獨立 EXE，不包含 Node.js 或 Codex。
 
-1. 解壓縮 `codex-autoaccept-cli-windows-0.1.7.zip`。
-2. Windows Terminal 開啟 PowerShell，進入解壓縮的 `codex-autoaccept-cli-0.1.7` 資料夾。
+1. 解壓縮 `codex-autoaccept-cli-windows-0.1.8.zip`。
+2. Windows Terminal 開啟 PowerShell，進入解壓縮的 `codex-autoaccept-cli-0.1.8` 資料夾。
 3. 檢查環境並跑自我測試：
 
 ```powershell
@@ -34,13 +34,13 @@ npm.cmd ci
 
 ```powershell
 cd C:\work\my-project
-& 'C:\tools\codex-autoaccept-cli-0.1.7\codex-auto.cmd' --auto
+& 'C:\tools\codex-autoaccept-cli-0.1.8\codex-auto.cmd' --auto
 ```
 
 請將上面工具路徑改為你的解壓縮位置。所有 Codex 參數放在 `--` 後面：
 
 ```powershell
-& 'C:\tools\codex-autoaccept-cli-0.1.7\codex-auto.cmd' --auto -- resume
+& 'C:\tools\codex-autoaccept-cli-0.1.8\codex-auto.cmd' --auto -- resume
 ```
 
 預設 OFF；只有 `--auto` 或指定 config 裡的 `enabled: true` 會開啟。執行中按 **Ctrl+]** 切換 ON／OFF，終端機會顯示目前模式。`Ctrl+C`、方向鍵、貼上與一般輸入會轉送給 Codex；`Ctrl+]` 為包裝器保留熱鍵。如果鍵盤配置無法送出 Ctrl+]，可退出後用 `--auto` / `--off` 重啟。
@@ -48,7 +48,7 @@ cd C:\work\my-project
 建議首次真實 Codex 測試先使用 dry run：
 
 ```powershell
-& 'C:\tools\codex-autoaccept-cli-0.1.7\codex-auto.cmd' --auto --dry-run
+& 'C:\tools\codex-autoaccept-cli-0.1.8\codex-auto.cmd' --auto --dry-run
 ```
 
 dry run 只記錄可辨識的提示，不會自動送鍵；仍可手動確認。按 Ctrl+] 也不會解除 dry run。
@@ -58,7 +58,7 @@ dry run 只記錄可辨識的提示，不會自動送鍵；仍可手動確認。
 設定只從你明確傳入的檔案載入，不會從專案自動搜尋：
 
 ```powershell
-& 'C:\tools\codex-autoaccept-cli-0.1.7\codex-auto.cmd' --config 'C:\tools\codex-autoaccept-cli-0.1.7\config.example.json' --auto
+& 'C:\tools\codex-autoaccept-cli-0.1.8\codex-auto.cmd' --config 'C:\tools\codex-autoaccept-cli-0.1.8\config.example.json' --auto
 ```
 
 JSON 支援 `enabled`、`dryRun`、`approveFileChanges`、`expandLongCommands`、`allowPatterns`、`denyPatterns`。規則是 JavaScript regex，不是 glob；無效 JSON、型別或 regex 會在啟動 Codex 前拒絕啟動。變更檔案後需重新啟動；Ctrl+] 的狀態不會寫回檔案。
@@ -129,9 +129,15 @@ Get-Content "$env:LOCALAPPDATA\CodexAutoAccept\cli.log" -Tail 20 -Wait
 
 不再把 MANUAL／UNRECOGNIZED 寫入正在使用的 Codex terminal，以免診斷占用畫面、干擾 TUI 或讓使用者誤判操作狀態。所有自動決策與辨識診斷只寫入 cli.log；啟動資訊、使用者 Ctrl+] 切換回饋及終止錯誤仍會顯示。保留 0.1.4 的標題重繪修正。
 
+## 0.1.8：修正官方展開提示格式
+
+官方提示為 `[… 38 lines] ctrl+a view all`，而 0.1.7 僅匹配 `+38 lines`，造成沒有 EXPAND 紀錄、直接停在 MANUAL clipped content。0.1.8 支援官方中括號／省略號格式，以及 ASCII `[...]` 變體；仍要求完整核准選單和明確 Ctrl+A 快捷鍵。自我測試已改用官方格式，不再只測錯誤的合成樣板。
+
+36 項測試與本機真實 PTY 展開測試通過。舊 0.1.7 在官方格式回歸測試會失敗；新版能啟動展開並完成雙頁讀取、返回及單次核准。公司 Windows 的後續檢視器相容性仍待驗證。使用 `--auto --self-test-expanded` 可先確認傳輸流程；實際操作時應開始出現 EXPAND 紀錄。
+
 ## 0.1.7：自動展開長命令並讀取內容（Windows 測試版）
 
-`expandLongCommands` 預設 `true`，只處理完整英文命令核准選單中明確顯示的 `+數字 lines … ctrl+a … view all` 提示。只有 ON 且非 dry run 才會送出展開／翻頁鍵。設定為 `false` 可回到 0.1.6 的人工處理方式。
+`expandLongCommands` 預設 `true`，只處理完整英文命令核准選單中明確顯示的展開提示。0.1.7 原先要求 `+數字 lines`，0.1.8 已修正為支援官方 `[… 數字 lines] ctrl+a view all` 格式。只有 ON 且非 dry run 才會送出展開／翻頁鍵。設定為 `false` 可回到 0.1.6 的人工處理方式。
 
 流程是 Ctrl+A → 辨識官方 `/ E X E C` 檢視器與預設 PageDown／q 提示 → 讀取命令分頁 → 檢查最後一頁的連續重疊 → 套用完整命令的拒絕／白名單 → q 返回 → 確認仍為同一個核准提示 → 送出一次 y。檢視器顯示完整命令，而非長 Reason 摘要。掃描期間畫面會切入官方檢視器並翻頁，不會額外印出診斷訊息。
 

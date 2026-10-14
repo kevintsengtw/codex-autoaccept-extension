@@ -4,7 +4,7 @@ process.stdin.setEncoding('utf8');
 process.stdin.resume();
 const expanded = process.argv.includes('--expanded');
 const ordinary = 'Would you like to run the following command?\r\n\r\n  $ echo codex-auto-self-test\r\n\r\n› 1. Yes, proceed (y)\r\n  3. No, and tell Codex what to do differently (esc)\r\n\r\n  Press enter to confirm or esc to cancel';
-const modal = ordinary.replace('  $ echo codex-auto-self-test', '  $ echo shown\r\n  +70 lines ctrl+a to view all');
+const modal = ordinary.replace('  $ echo codex-auto-self-test', '  $ echo shown\r\n  [\u2026 70 lines] ctrl+a view all');
 const height = Math.max(4, (process.stdout.rows || 40) - 5);
 const command = Array.from({length: height + Math.ceil(height / 2)}, (_, i) => `echo harmless-fixture-line-${i}`);
 let phase = 'modal';

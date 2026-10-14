@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const {createExpandedApproval, candidate, pager} = require('../lib/expanded-approval');
-const modal = cmd => `Would you like to run the following command?\nReason: long script\n $ ${cmd}\n+30 lines ctrl+a to view all\n› 1. Yes, proceed (y)\n 2. No, and tell Codex what to do differently (esc)\nPress enter to confirm or esc to cancel`;
+const modal = cmd => `Would you like to run the following command?\nReason: long script\n $ ${cmd}\n[\u2026 30 lines] ctrl+a view all\n› 1. Yes, proceed (y)\n 2. No, and tell Codex what to do differently (esc)\nPress enter to confirm or esc to cancel`;
 const view = (rows, pct=100, title='E X E C') => `/ ${title} / / /\n${rows.join('\n')}\n──────── ${pct}% ─\n ↑/↓ to scroll · pgup/pgdn to page · home/end to jump\n q close`;
 function fixture(extra={}) {
   const writes=[],logs=[];let time=0;
@@ -56,4 +56,19 @@ test('changed original approval, OFF, cancellation and unknown viewers cannot re
 test('log errors prevent opening a viewer or sending an approval',()=>{
   const writes=[];const s=createExpandedApproval({child:{write:x=>writes.push(x)},settings:{enabled:true,expandLongCommands:true},log:()=>{throw Error('disk full');}});
   assert.throws(()=>s.inspect({logical:modal('echo hi'),physical:modal('echo hi')}),/disk full/);assert.deepEqual(writes,[]);
+});
+test('official bracketed ellipsis hints initiate expansion without requiring a plus sign',()=>{
+  const original=modal('echo shown');
+  assert.ok(original.includes('[\u2026 30 lines]'));
+  for(const hint of ['[\u2026 38 lines] ctrl+a view all','[... 38 lines] ctrl+a view all','+38 lines ctrl+a view all','[\u2026 38 lines] | ctrl+a view all']) {
+    const f=fixture();const actual=original.replace('[\u2026 30 lines] ctrl+a view all',hint);
+    f.feed(actual);assert.deepEqual(f.writes,['\x01'],hint);
+    f.feed(view(['echo full command']));f.feed(actual);assert.equal(f.writes.at(-1),'y');
+  }
+});
+test('ellipsis without explicit expansion hint, remapped shortcut and missing approval options stay manual',()=>{
+  const origin=modal('echo shown');
+  for(const changed of [origin.replace('ctrl+a view all',''),origin.replace('ctrl+a','ctrl+o'),origin.replace('Yes, proceed (y)','Continue')]) {
+    const f=fixture();f.feed(changed);assert.deepEqual(f.writes,[]);
+  }
 });

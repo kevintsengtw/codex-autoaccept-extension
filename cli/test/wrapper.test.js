@@ -202,7 +202,7 @@ test('an expansion log failure stops keys and cleanup cannot throw again',async 
   const s=createSession({child:{write:x=>sent.push(x)},settings:{...settings({}),enabled:true},cols:120,rows:40,
     log:()=>{throw Error('disk full');},onError:e=>errors.push(e.message)});
   t.after(()=>s.stop());
-  s.feed(prompt('echo shown\r\n+70 lines ctrl+a to view all'));await sleep(330);
+  s.feed(prompt('echo shown\r\n[\u2026 70 lines] ctrl+a view all'));await sleep(330);
   assert.deepEqual(sent,[]);assert.deepEqual(errors,['disk full']);
   assert.doesNotThrow(()=>s.stop());
 });

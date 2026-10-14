@@ -48,3 +48,7 @@ User's 0.1.6 log reports MANUAL clipped content with an explicit Ctrl+A view-all
 34 tests pass, including hidden destructive content on last page, rounded 100%, ambiguous overlap, original-prompt change, cancellation and log failure. macOS real PTY ordinary self-test and new two-page expanded self-test pass. Windows live verification pending.
 
 Official source reviewed: openai/codex codex-rs/tui/src/app/event_dispatch.rs (FullScreenApprovalRequest uses full_cmd and E X E C title), bottom_pane/approval_overlay.rs (open_fullscreen shortcut), pager_overlay.rs (page-height, percentage rounding, q-close hints). This is a format-specific text/PTY integration, not a protocol-level guarantee. Source reviewed from GitHub main; the user's installed CLI compatibility must be verified in Windows.
+
+## 0.1.8 - 2026-10-14
+
+User 0.1.7 log shows MANUAL clipped content with no EXPAND despite a visible official view-all hint. Verified ListSelectionView renders "[ellipsis N lines] ctrl+a view all" while the original candidate required +N lines. Fixed recognition and replaced the default test/self-test hint with the official bracketed form. Added ASCII-ellipsis, separator, absent-hint and remapped-key cases. Old 0.1.7 fails the exact official-format regression; updated recognition passes. 36 tests and real macOS PTY expanded test pass. Windows viewer compatibility still pending. This corrects an implementation and fixture error, not a newly assumed root cause.
