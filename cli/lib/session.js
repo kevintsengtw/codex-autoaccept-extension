@@ -1,8 +1,10 @@
 const {Terminal} = require('@xterm/headless');
 const {detect, diagnose} = require('./detector');
+const {createExpandedApproval} = require('./expanded-approval');
 function createSession({child, settings, cols, rows, log, onError = err => {throw err;}, setTimer = setTimeout, clearTimer = clearTimeout}) {
   const screen = new Terminal({cols, rows, scrollback: 0, allowProposedApi: true});
   let ended = false, timer, last = '', diagnostic = '', writing = 0;
+  const expanded = createExpandedApproval({child, settings, log});
   function snapshot() {
     const buffer = screen.buffer.active, lines = [], physical = [];
     for (let i = 0; i < screen.rows; i++) {
@@ -21,7 +23,14 @@ function createSession({child, settings, cols, rows, log, onError = err => {thro
   }
   function inspect() {
     if (ended || writing || !settings.enabled) return;
-    const {logical: text, physical} = snapshot();
+    const frames = snapshot();
+    const expansion = expanded.inspect(frames);
+    if (expansion) {
+      if (expansion.identity) last = expansion.identity;
+      if (expansion.active) schedule();
+      return;
+    }
+    const {logical: text, physical} = frames;
     // Logical rows restore soft wraps; physical rows independently preserve UI boundaries.
     // Retry only unrecognized layouts, never override a policy/clipping rejection.
     let result = detect(text, settings);
@@ -71,6 +80,7 @@ function createSession({child, settings, cols, rows, log, onError = err => {thro
     },
     input(data) {
       if (ended) return;
+      expanded.cancel('user input; automatic scan stopped');
       // Ctrl+] is reserved by the wrapper. Everything else, including Ctrl+C, is forwarded.
       for (const part of data.split(/(\x1d)/)) {
         if (part === '\x1d') {
@@ -83,9 +93,16 @@ function createSession({child, settings, cols, rows, log, onError = err => {thro
     resize(cols, rows) {
       if (ended) return;
       clearTimer(timer); timer = undefined;
+      expanded.cancel('terminal resized; automatic scan stopped');
       child.resize(cols, rows); screen.resize(cols, rows); schedule();
     },
-    stop() { if (ended) return; ended = true; clearTimer(timer); screen.dispose(); }
+    stop() {
+      if (ended) return;
+      ended = true; clearTimer(timer);
+      // Cleanup must still restore the terminal when the log itself has failed.
+      try {expanded.cancel('session ended');} catch {}
+      screen.dispose();
+    }
   };
 }
 module.exports = {createSession};

@@ -13,7 +13,7 @@
 | 成品 | 版本 | 用途 |
 | --- | --- | --- |
 | [codex-autoaccept-0.1.1.vsix](artifacts/codex-autoaccept-0.1.1.vsix) | 0.1.1 | VS Code 擴充套件 |
-| [codex-autoaccept-cli-windows-0.1.6.zip](artifacts/codex-autoaccept-cli-windows-0.1.6.zip) | 0.1.6 | Windows Terminal 獨立 CLI 測試版 |
+| [codex-autoaccept-cli-windows-0.1.7.zip](artifacts/codex-autoaccept-cli-windows-0.1.7.zip) | 0.1.7 | Windows Terminal 獨立 CLI 測試版 |
 | [SHA256SUMS](artifacts/SHA256SUMS) | — | 成品雜湊值 |
 
 VS Code 版與 Windows CLI 包裝器分別版本化，兩個開關互不連動。本專案目前使用 VSIX 發佈，**尚未上架 VS Code Marketplace**。
@@ -155,8 +155,8 @@ CLI 目前只辨識官方**英文完整核准選單**，包含 `Yes, proceed (y)
 
 ### 安裝與自我測試
 
-1. 解壓縮 `codex-autoaccept-cli-windows-0.1.6.zip`。
-2. Windows Terminal 開啟 PowerShell，進入解壓縮後的 `codex-autoaccept-cli-0.1.6` 目錄。
+1. 解壓縮 `codex-autoaccept-cli-windows-0.1.7.zip`。
+2. Windows Terminal 開啟 PowerShell，進入解壓縮後的 `codex-autoaccept-cli-0.1.7` 目錄。
 3. 執行：
 
    ```powershell
@@ -175,7 +175,7 @@ ZIP 已含 npm 提供的 Windows x64／ARM64 `node-pty` 依賴，正常解壓後
 
 ```powershell
 cd C:\work\my-project
-& 'C:\tools\codex-autoaccept-cli-0.1.6\codex-auto.cmd' --auto
+& 'C:\tools\codex-autoaccept-cli-0.1.7\codex-auto.cmd' --auto
 ```
 
 請將路徑換成你的解壓縮位置。預設 OFF，`--auto` 開啟，`--off` 關閉；執行中 **Ctrl+]** 切換，狀態不寫回 config。若鍵盤無法送出熱鍵，退出後以啟動參數切換。
@@ -183,13 +183,13 @@ cd C:\work\my-project
 Codex 自己的參數必須放在 `--` 後：
 
 ```powershell
-& 'C:\tools\codex-autoaccept-cli-0.1.6\codex-auto.cmd' --auto -- resume
+& 'C:\tools\codex-autoaccept-cli-0.1.7\codex-auto.cmd' --auto -- resume
 ```
 
 首次真實測試建議 dry run：
 
 ```powershell
-& 'C:\tools\codex-autoaccept-cli-0.1.6\codex-auto.cmd' --auto --dry-run
+& 'C:\tools\codex-autoaccept-cli-0.1.7\codex-auto.cmd' --auto --dry-run
 ```
 
 `--dry-run` 只記錄，不送鍵；Ctrl+] 不會解除 dry run。一般輸入、Ctrl+C、貼上和方向鍵轉送給 Codex。
@@ -205,6 +205,8 @@ Codex 自己的參數必須放在 `--` 後：
 - 未驗證 WSL、Git Bash、SSH；不支援輸入／輸出重新導向。
 
 完整參數、設定範例、log 和驗收步驟見 [CLI README](cli/README.md)。
+
+0.1.7 預設啟用 CLI 設定 `expandLongCommands`：遇到明確 Ctrl+A 展開提示時，嘗試讀取官方完整命令檢視器、檢查規則，再返回同一核准提示。只支援可辨識的預設介面；不完整或未知狀態保留人工確認。可先用 `--auto --self-test-expanded` 測試。完整限制見 [CLI README](cli/README.md)。公司 Windows 實測待回報。
 
 ## GUI 原理、相容性與排除問題
 
@@ -265,7 +267,7 @@ CLI ZIP 打包腳本需要 Python 3，成品會包含 npm 提供的 Windows 原�
 | `docs/` | 驗證紀錄 |
 | `artifacts/` | 已打包 VSIX、Windows ZIP 及 checksum |
 
-0.1.1 修正開關寫入與刷新、快速連點、失敗回報，並保留錯誤設定下的使用者開關意圖；自動核准仍暫停至設定修正。Windows CLI 測試版為 0.1.6。
+0.1.1 修正開關寫入與刷新、快速連點、失敗回報，並保留錯誤設定下的使用者開關意圖；自動核准仍暫停至設定修正。Windows CLI 測試版為 0.1.7。
 
 ## 參考來源與授權
 

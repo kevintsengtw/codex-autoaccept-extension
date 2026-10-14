@@ -5,7 +5,7 @@ const os = require('node:os');
 const {parse, settings: loadSettings} = require('../lib/options');
 const {resolveCodex} = require('../lib/resolve');
 const {createSession} = require('../lib/session');
-const HELP = `Codex Auto-Accept CLI 0.1.6
+const HELP = `Codex Auto-Accept CLI 0.1.7
 Usage: codex-auto [wrapper options] -- [Codex arguments]
   --auto          Start auto-accept ON (default OFF)
   --off           Start OFF, overriding config
@@ -13,6 +13,7 @@ Usage: codex-auto [wrapper options] -- [Codex arguments]
   --config PATH   Load explicit JSON configuration
   --codex PATH    Codex executable or official bin/codex.js
   --log PATH      Metadata-only log file
+  --self-test-expanded  Exercise expansion, paging and return with a local fixture
   --self-test     Exercise PTY approval with a harmless local fixture
   --help          Show this help
 During a session: Ctrl+] toggles ON/OFF. Ctrl+C is passed to Codex.
@@ -26,11 +27,11 @@ function main() {
   if (options.help) {process.stdout.write(HELP);return;}
   if (!process.stdin.isTTY || !process.stdout.isTTY || !process.stdin.setRawMode) throw Error('Use an interactive terminal (Windows Terminal); redirected stdin/stdout is not supported.');
   const settings = loadSettings(options);
-  const target = options.selfTest ? {file: process.execPath, args: [path.join(__dirname, 'self-test-child.js')]} : resolveCodex(options.codex);
+  const target = options.selfTest ? {file: process.execPath, args: [path.join(__dirname, 'self-test-child.js'), ...(options.expandedSelfTest ? ['--expanded'] : [])]} : resolveCodex(options.codex);
   const logPath = options.log ? path.resolve(options.log) : path.join(process.env.LOCALAPPDATA ?? path.join(os.homedir(), '.local', 'state'), 'CodexAutoAccept', 'cli.log');
   fs.mkdirSync(path.dirname(logPath), {recursive: true});
   // A log failure stops approvals rather than silently losing the decision record.
-  fs.appendFileSync(logPath, `${new Date().toISOString()} START CLI=0.1.6 ${settings.enabled ? 'ON' : 'OFF'}${settings.dryRun ? ' DRY_RUN' : ''}\n`, {mode:0o600});
+  fs.appendFileSync(logPath, `${new Date().toISOString()} START CLI=0.1.7 ${settings.enabled ? 'ON' : 'OFF'}${settings.dryRun ? ' DRY_RUN' : ''}\n`, {mode:0o600});
   process.stderr.write(`[codex-auto] ${settings.enabled ? 'ON' : 'OFF'}${settings.dryRun ? ' (dry run)' : ''} | Ctrl+] toggles | log: ${logPath}\r\n`);
   let pty;
   try {pty = require('node-pty');} catch (err) {throw Error(`Cannot load node-pty. Run npm ci in this package on the target Windows computer using native Windows Node.js. ${err.message}`);}

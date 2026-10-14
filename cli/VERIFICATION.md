@@ -40,3 +40,11 @@ User reports diagnostic terminal output introduced in 0.1.3 occupies the TUI, co
 User reports one uninterrupted Windows 0.1.5 run using right-click paste; log shows repeated ACCEPT. Later a long pwsh approval stops with missing command start ($ prefix), terminal=209x51. Ctrl+V prompt splitting remains unresolved.
 
 0.1.6 retries unrecognized logical layouts with independent physical rows; supports standalone dollar markers followed by execution content; normalizes decision identity across representations. Policy/clipping denials are not overridden. Explicit hidden-lines markers remain manual. No input-forwarding change or UI diagnostic output. Twenty-six tests pass including physical-row recovery, deny/clipping enforcement and deduplication. Original 0.1.5 fails the recovery regression with the user's same diagnostic; the updated logic passes. This demonstrates a possible cause, not proof of the exact company screen. Windows live verification pending.
+
+## 0.1.7 - 2026-10-14
+
+User's 0.1.6 log reports MANUAL clipped content with an explicit Ctrl+A view-all hint. Added opt-out expandLongCommands (default true), a bounded EXEC pager reader, PageDown collection with unique final-page overlap checks, full-command policy evaluation, and same-modal return verification before y. Unknown/incomplete/ambiguous/stalled pages never receive approval. OFF/dry-run/input/resize/end stop navigation. No added terminal diagnostics or paste-forwarding change.
+
+34 tests pass, including hidden destructive content on last page, rounded 100%, ambiguous overlap, original-prompt change, cancellation and log failure. macOS real PTY ordinary self-test and new two-page expanded self-test pass. Windows live verification pending.
+
+Official source reviewed: openai/codex codex-rs/tui/src/app/event_dispatch.rs (FullScreenApprovalRequest uses full_cmd and E X E C title), bottom_pane/approval_overlay.rs (open_fullscreen shortcut), pager_overlay.rs (page-height, percentage rounding, q-close hints). This is a format-specific text/PTY integration, not a protocol-level guarantee. Source reviewed from GitHub main; the user's installed CLI compatibility must be verified in Windows.

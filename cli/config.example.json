@@ -2,6 +2,7 @@
   "enabled": false,
   "dryRun": false,
   "approveFileChanges": true,
+  "expandLongCommands": true,
   "allowPatterns": [],
   "denyPatterns": [
     "\\b(Remove-Item|ri|del|erase|rmdir|rd)\\b",
