@@ -2,6 +2,35 @@ const test=require('node:test');
 const assert=require('node:assert/strict');
 const {evaluate,describe}=require('../lib/policy');
 const config={allowPatterns:[],denyPatterns:[]};
+test('B005 does not join Git report prose and later metadata into a destructive command',()=>{
+  const report=`$lines = @('No Git write command was executed',
+    'report covers reset, clean and push status', 'evidence: 06-preflight-inventory.stdout.txt');
+    Set-Content -LiteralPath 'completion-report.json' -Value ($lines | ConvertTo-Json)`;
+  assert.equal(evaluate(report,config).allow,true);
+  assert.equal(evaluate(`pwsh.exe -Command "${report}"`,config).allow,true);
+  for(const cmd of ['git status; Write-Output "clean -failure"',
+    'git diff --name-status; Write-Output "reset --hard was not executed"',
+    'git clean -n; Write-Output "-failure"','git push origin main; Write-Output "--force"',
+    '$git = 1; $clean = 1; Write-Output "-failure"']){
+    assert.equal(evaluate(cmd,config).allow,true,cmd);
+  }
+  assert.deepEqual(evaluate(report,{...config,denyPatterns:['preflight']}).rules,
+    [{id:'D001',category:'user-defined'}]);
+});
+test('B005 still denies real destructive Git subcommands and full option tokens',()=>{
+  for(const cmd of ['git reset --hard','git reset HEAD --hard','git clean -f','git clean -fdx',
+    'git clean -xffd','git clean --force','git push -f','git push origin main --force',
+    'git push --force-with-lease origin main','git push --force-with-lease=main:abc origin main',
+    'git push origin +HEAD:main','git -C "repo path" reset --hard',
+    "git -c advice.detachedHead=false -C 'repo path' clean -fd",
+    'git --git-dir=repo/.git --work-tree=repo reset --hard',
+    'git --no-pager push origin main --force','"C:\\tools\\git.exe" reset --hard',
+    'pwsh -Command "git reset --hard"',"sh -c 'git clean -fd'",
+    'git reset "--hard"', 'git\n-C repo\nreset --hard']){
+    const d=evaluate(cmd,config);assert.equal(d.allow,false,cmd);
+    assert.ok(d.rules.some(r=>r.id==='B005'),cmd);
+  }
+});
 test('B001 does not mistake PowerShell variable names for delete command aliases',()=>{
   const query=`$rd = Get-Content -LiteralPath 'diagnostics.json' -Raw | ConvertFrom-Json;
     $rs = Get-Content -LiteralPath 'summary.json' -Raw | ConvertFrom-Json;

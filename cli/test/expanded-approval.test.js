@@ -139,3 +139,11 @@ test('pager diagnostics identify each structural boundary without command conten
   assert.ok(diagnosePager(text.replace('pgup/pgdn','unknown')).includes('pgup/pgdn'));
   assert.ok(diagnosePager(text.replace('q close','unknown')).includes('q close'));
 });
+test('expanded Git report is approved while actual forced Git operation stays manual',()=>{
+  const origin=modal('echo shown'),f=fixture();f.feed(origin);
+  f.feed(view(["$report = 'No Git write command executed; clean status; 06-preflight-inventory.stdout.txt'",'Set-Content report.json $report']));
+  f.feed(origin);assert.deepEqual(f.writes,['\x01','q','y']);
+  const g=fixture();g.feed(origin);g.feed(view(['git -C repo push origin main --force']));g.feed(origin);
+  assert.equal(g.writes.includes('y'),false);
+  assert.equal(g.logs.at(-1)[1],'expanded approval: deny rule; rules=B005:git-destructive');
+});

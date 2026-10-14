@@ -1,4 +1,8 @@
 // Regex rules are heuristics, not a shell parser or a security boundary.
+const GIT_ARG = `(?:"[^"\\r\\n]*"|'[^'\\r\\n]*'|[^\\s;|&"'(){}]+)`;
+const GIT_GLOBAL = `(?:(?:-[Cc]|--(?:git-dir|work-tree|namespace|config-env))\\s+${GIT_ARG}|-[Cc][^\\s;|&"']+|--(?:git-dir|work-tree|namespace|config-env)=[^\\s;|&"']+|--(?:no-pager|paginate|bare|no-replace-objects|literal-pathspecs|glob-pathspecs|noglob-pathspecs|icase-pathspecs))\\s+`;
+const GIT_END = `(?=$|[\\s;|&"'(){}])`;
+const GIT_FLAGS = `(?:reset\\s+(?:${GIT_ARG}\\s+)*?["']?--hard["']?${GIT_END}|clean\\s+(?:${GIT_ARG}\\s+)*?["']?(?:-[dfinqxe]*f[dfinqxe]*|--force)["']?${GIT_END}|push\\s+(?:${GIT_ARG}\\s+)*?["']?(?:-[vfnuq]*f[vfnuq]*|--force(?:-with-lease|-if-includes)?(?:=[^\\s;|&"']+)?|\\+[^\\s;|&"']+)["']?${GIT_END})`;
 const BUILTIN_DENY = [
   '\\b(Remove-Item|ri|del|erase|rmdir|rd)\\b',
   '\\b(Format-Volume|Clear-Disk|diskpart|format\\s+[a-z]:)\\b',
@@ -6,7 +10,9 @@ const BUILTIN_DENY = [
   // Require an invocation-shaped rm token and complete known short options.
   // A quoted tool name in a list and PowerShell -ErrorAction are not rm -r.
   "\\brm(?:\\.exe)?[\"']?\\s+(?:[^\\n;|]*?\\s)?(?:-[dfirv]*r[dfirv]*|--recursive|--no-preserve-root)(?=$|[\\s;\"'])",
-  '\\bgit\\b.*\\b(reset\\b.*--hard|clean\\b.*-[a-z]*f|push\\b.*(--force|-[a-z]*f\\b|\\+\\S))',
+  // Require git's subcommand after its global options and a complete flag
+  // token in that argument sequence, not arbitrary words later in a report.
+  `\\bgit(?:\\.exe)?["']?\\s+(?:${GIT_GLOBAL})*${GIT_FLAGS}`,
   '\\b(drop\\s+(database|table|schema)|truncate\\s+table|delete\\s+from)\\b',
   '\\b(mkfs|shutdown|reboot)\\b', '\\bdd\\b.*\\bof=', '\\bchmod\\b.*\\b777\\b',
   '\\b(curl|wget)\\b[^|]*\\|\\s*(sudo\\s+)?(sh|bash|zsh|python\\d*|node|perl|ruby)\\b',

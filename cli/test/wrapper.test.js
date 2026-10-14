@@ -61,6 +61,14 @@ test('PowerShell rd variable approval succeeds but actual rd command still stays
   await sleep(330);assert.deepEqual(sent,['y']);
   assert.ok(logs.some(x=>x[0]==='MANUAL'&&x[1].includes('B001:windows-file-delete')));
 });
+test('Git report text receives one approval but actual hard reset remains manual',async t=>{
+  const {s,sent,logs}=session(t);
+  s.feed(prompt("$report = 'No Git write command executed; clean status; 06-preflight-inventory.stdout.txt'; Set-Content report.json $report"));
+  await sleep(330);assert.deepEqual(sent,['y']);
+  s.feed('\x1b[2J\x1b[H'+prompt('git -C repo reset --hard'));
+  await sleep(330);assert.deepEqual(sent,['y']);
+  assert.ok(logs.some(x=>x[0]==='MANUAL'&&x[1].includes('B005:git-destructive')));
+});
 test('terminal focus notifications are forwarded without cancelling expanded approval',async t=>{
   const {s,sent}=session(t);
   const origin=prompt('echo shown\r\n[\u2026 30 lines] ctrl+a view all');
