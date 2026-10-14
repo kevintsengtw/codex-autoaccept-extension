@@ -64,3 +64,9 @@ Added CLI-only bounded log rotation: 5 MiB active file plus 3 backups by default
 49 tests cover retention, oversized legacy files, UTF-8 boundaries, reduced/zero backups, unrelated files, unsafe targets, parallel processes, stale-lock recovery and validation. Windows live filesystem validation pending. Existing successful 0.1.9 Windows approval behavior remains the baseline; the new manager is not yet claimed verified there.
 
 Local macOS real PTY expanded self-test passed using a temporary prefilled oversized log and a 64 KiB limit. Existing log rotated into .1, both files stayed within limit, and the final ACCEPT record was present. No normal-profile log was changed by this test.
+
+## 0.1.11 - 2026-10-14
+
+Screenshot shows B004 rejecting a tool inventory: a quoted rm.exe array member followed by Get-Command -ErrorAction. The old regex joined unrelated text and interpreted letters in ErrorAction as a recursive short option. B004 now requires an invocation-shaped rm/rm.exe token followed by whitespace and a complete supported recursive option token; it does not scan across semicolons or pipes. Other deny rules and static diagnostic IDs remain unchanged. This remains a heuristic, not a shell parser.
+
+52 local tests cover the synthetic tool inventory, wrapped PowerShell, custom deny precedence, actual recursive options, executable paths, shell wrappers, and a terminal session that sends one y for inventory but no key for recursive deletion. Full company command was neither required nor stored. Windows live validation pending. Includes 0.1.10 log retention.

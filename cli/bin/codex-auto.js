@@ -5,7 +5,7 @@ const {parse, settings: loadSettings} = require('../lib/options');
 const {resolveCodex} = require('../lib/resolve');
 const {createSession} = require('../lib/session');
 const {createRotatingLog} = require('../lib/rotating-log');
-const HELP = `Codex Auto-Accept CLI 0.1.10
+const HELP = `Codex Auto-Accept CLI 0.1.11
 Usage: codex-auto [wrapper options] -- [Codex arguments]
   --auto          Start auto-accept ON (default OFF)
   --off           Start OFF, overriding config
@@ -31,7 +31,7 @@ function main() {
   const logPath = options.log ? path.resolve(options.log) : path.join(process.env.LOCALAPPDATA ?? path.join(os.homedir(), '.local', 'state'), 'CodexAutoAccept', 'cli.log');
   const logger = createRotatingLog(logPath,{maxBytes:settings.logMaxBytes,backups:settings.logBackupCount});
   // A log failure stops approvals rather than silently losing the decision record.
-  logger.append(`${new Date().toISOString()} START CLI=0.1.10 ${settings.enabled ? 'ON' : 'OFF'}${settings.dryRun ? ' DRY_RUN' : ''}\n`);
+  logger.append(`${new Date().toISOString()} START CLI=0.1.11 ${settings.enabled ? 'ON' : 'OFF'}${settings.dryRun ? ' DRY_RUN' : ''}\n`);
   process.stderr.write(`[codex-auto] ${settings.enabled ? 'ON' : 'OFF'}${settings.dryRun ? ' (dry run)' : ''} | Ctrl+] toggles | log: ${logPath}\r\n`);
   let pty;
   try {pty = require('node-pty');} catch (err) {throw Error(`Cannot load node-pty. Run npm ci in this package on the target Windows computer using native Windows Node.js. ${err.message}`);}

@@ -3,7 +3,9 @@ const BUILTIN_DENY = [
   '\\b(Remove-Item|ri|del|erase|rmdir|rd)\\b',
   '\\b(Format-Volume|Clear-Disk|diskpart|format\\s+[a-z]:)\\b',
   '\\b(Invoke-Expression|iex)\\b',
-  '\\brm\\b[^\\n]*\\s(-[a-z]*r[a-z]*|--recursive|--no-preserve-root)\\b',
+  // Require an invocation-shaped rm token and complete known short options.
+  // A quoted tool name in a list and PowerShell -ErrorAction are not rm -r.
+  "\\brm(?:\\.exe)?[\"']?\\s+(?:[^\\n;|]*?\\s)?(?:-[dfirv]*r[dfirv]*|--recursive|--no-preserve-root)(?=$|[\\s;\"'])",
   '\\bgit\\b.*\\b(reset\\b.*--hard|clean\\b.*-[a-z]*f|push\\b.*(--force|-[a-z]*f\\b|\\+\\S))',
   '\\b(drop\\s+(database|table|schema)|truncate\\s+table|delete\\s+from)\\b',
   '\\b(mkfs|shutdown|reboot)\\b', '\\bdd\\b.*\\bof=', '\\bchmod\\b.*\\b777\\b',

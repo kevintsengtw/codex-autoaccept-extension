@@ -45,6 +45,14 @@ test('real ANSI processing sends y exactly once per visible prompt',async t=>{
   s.feed('\x1b[2J\x1b[Hfinished');await sleep(330);
   s.feed('\x1b[2J\x1b[H'+prompt('echo hello'));await sleep(330);assert.deepEqual(sent,['y','y']);
 });
+test('tool inventory approval receives one y while recursive rm remains manual',async t=>{
+  const {s,sent,logs}=session(t);
+  s.feed(prompt("@('openfiles.exe', 'rm.exe') | ForEach-Object { Get-Command $_ -ErrorAction SilentlyContinue }"));
+  await sleep(330);assert.deepEqual(sent,['y']);
+  s.feed('\x1b[2J\x1b[H'+prompt('rm.exe -rf example'));
+  await sleep(330);assert.deepEqual(sent,['y']);
+  assert.ok(logs.some(entry=>entry[0]==='MANUAL'&&entry[1].includes('B004:recursive-delete')));
+});
 test('Ctrl+] toggles; Ctrl+C and other input reach the child',async t=>{
   const {s,sent}=session(t,false);s.feed(prompt('echo hi'));await sleep(330);assert.deepEqual(sent,[]);
   s.input('\x1d');await sleep(330);assert.deepEqual(sent,['y']);

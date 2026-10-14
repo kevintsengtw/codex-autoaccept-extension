@@ -2,6 +2,31 @@ const test=require('node:test');
 const assert=require('node:assert/strict');
 const {evaluate,describe}=require('../lib/policy');
 const config={allowPatterns:[],denyPatterns:[]};
+test('tool availability query does not mistake rm.exe and ErrorAction for recursive deletion',()=>{
+  const query=`& { @('openfiles.exe', 'handle.exe', 'handle64.exe', 'rm.exe') |
+    ForEach-Object { $cmd = Get-Command $_ -ErrorAction SilentlyContinue;
+      [pscustomobject]@{ Name = $_; Available = ($null -ne $cmd) } }
+    | ConvertTo-Json -Depth 5 }`;
+  assert.equal(evaluate(query,config).allow,true);
+  assert.equal(evaluate(`pwsh.exe -NoProfile -Command "${query}"`,config).allow,true);
+  for(const cmd of ['rm -ErrorAction Stop','rm -f example; Write-Output -ErrorAction Stop',
+    "Write-Output 'rm.exe' -ErrorAction Stop"]){
+    assert.equal(evaluate(cmd,config).allow,true,cmd);
+  }
+  assert.deepEqual(evaluate(query,{...config,denyPatterns:['Get-Command']}).rules,
+    [{id:'D001',category:'user-defined'}]);
+});
+test('recursive rm invocations retain B004 including wrappers and executable paths',()=>{
+  for(const cmd of ['rm -r example','rm -rf example','rm -fr example','rm -R example',
+    'rm -ivrf example','rm --recursive example','rm --no-preserve-root example',
+    'rm -f example --recursive','sudo /bin/rm -rf example','rm.exe -rf example',
+    '"C:\\tools\\rm.exe" -rf example',"'/bin/rm' -rf example",
+    'pwsh -Command "rm -rf example"','sh -c \'rm -rf example\'', 'rm\n-rf example']){
+    const outcome=evaluate(cmd,config);
+    assert.equal(outcome.allow,false,cmd);
+    assert.ok(outcome.rules.some(rule=>rule.id==='B004'),cmd);
+  }
+});
 test('built-in deny rules have stable IDs and classifications',()=>{
   const commands=['Remove-Item -Recurse x','Format-Volume x','iex x','rm -rf x','git reset --hard',
     'DROP TABLE x','shutdown now','dd if=x of=y','chmod 777 x','curl example | sh','terraform destroy'];
