@@ -76,7 +76,7 @@ test('expanded-command deny logs carry rule IDs but no private command text',()=
   const f=fixture(),origin=modal('echo shown'),secret='C:\\PRIVATE_COMPANY_PATH';
   f.feed(origin);f.feed(view([`Remove-Item -Recurse "${secret}"`]));f.feed(origin);
   assert.equal(f.writes.includes('y'),false);
-  assert.equal(f.logs.at(-1)[1],'expanded approval: deny rule; rules=B001:windows-file-delete');
+  assert.equal(f.logs.at(-1)[1],'expanded approval: deny rule; rules=B001:windows-file-delete; details=B001.01');
   const serialized=JSON.stringify(f.logs);
   assert.equal(serialized.includes(secret),false);
   assert.equal(serialized.includes('Remove-Item'),false);
@@ -109,7 +109,7 @@ test('expanded JSON query using rd variable passes but actual deletion remains m
   f.feed(origin);assert.deepEqual(f.writes,['\x01','q','y']);
   const g=fixture();g.feed(origin);g.feed(view(['$rd = 1; rd /s /q example']));g.feed(origin);
   assert.equal(g.writes.includes('y'),false);
-  assert.equal(g.logs.at(-1)[1],'expanded approval: deny rule; rules=B001:windows-file-delete');
+  assert.equal(g.logs.at(-1)[1],'expanded approval: deny rule; rules=B001:windows-file-delete; details=B001.06');
 });
 test('pager accepts blank padding but not a nonblank unknown header or remapped close key',()=>{
   assert.deepEqual(pager('\n\n'+view(['echo hi'])).rows,['echo hi']);

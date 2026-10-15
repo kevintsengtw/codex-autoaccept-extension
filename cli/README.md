@@ -1,4 +1,4 @@
-# Codex Auto-Accept CLI — Windows 測試版 0.1.15
+# Codex Auto-Accept CLI — Windows 測試版 0.1.16
 
 在 Windows Terminal 內透過 ConPTY 啟動 Codex，辨識完整英文核准選單後送出單次 `y`。與 VS Code 擴充套件分開運作，不需要 VS Code，也不修改 Codex config、sandbox 或企業 managed requirements。
 
@@ -6,8 +6,8 @@
 
 條件：Windows 11 或支援 ConPTY 的 Windows 10（1903／build 18362 以上），**原生 Windows Node.js 22／24，x64 或 ARM64**，以及已可執行的 Codex CLI。此套件不是獨立 EXE，不包含 Node.js 或 Codex。
 
-1. 解壓縮 `codex-autoaccept-cli-windows-0.1.15.zip`。
-2. Windows Terminal 開啟 PowerShell，進入解壓縮的 `codex-autoaccept-cli-0.1.15` 資料夾。
+1. 解壓縮 `codex-autoaccept-cli-windows-0.1.16.zip`。
+2. Windows Terminal 開啟 PowerShell，進入解壓縮的 `codex-autoaccept-cli-0.1.16` 資料夾。
 3. 檢查環境並跑自我測試：
 
 ```powershell
@@ -34,13 +34,13 @@ npm.cmd ci
 
 ```powershell
 cd C:\work\my-project
-& 'C:\tools\codex-autoaccept-cli-0.1.15\codex-auto.cmd' --auto
+& 'C:\tools\codex-autoaccept-cli-0.1.16\codex-auto.cmd' --auto
 ```
 
 請將上面工具路徑改為你的解壓縮位置。所有 Codex 參數放在 `--` 後面：
 
 ```powershell
-& 'C:\tools\codex-autoaccept-cli-0.1.15\codex-auto.cmd' --auto -- resume
+& 'C:\tools\codex-autoaccept-cli-0.1.16\codex-auto.cmd' --auto -- resume
 ```
 
 預設 OFF；只有 `--auto` 或指定 config 裡的 `enabled: true` 會開啟。執行中按 **Ctrl+]** 切換 ON／OFF，終端機會顯示目前模式。`Ctrl+C`、方向鍵、貼上與一般輸入會轉送給 Codex；`Ctrl+]` 為包裝器保留熱鍵。如果鍵盤配置無法送出 Ctrl+]，可退出後用 `--auto` / `--off` 重啟。
@@ -48,7 +48,7 @@ cd C:\work\my-project
 建議首次真實 Codex 測試先使用 dry run：
 
 ```powershell
-& 'C:\tools\codex-autoaccept-cli-0.1.15\codex-auto.cmd' --auto --dry-run
+& 'C:\tools\codex-autoaccept-cli-0.1.16\codex-auto.cmd' --auto --dry-run
 ```
 
 dry run 只記錄可辨識的提示，不會自動送鍵；仍可手動確認。按 Ctrl+] 也不會解除 dry run。
@@ -58,7 +58,7 @@ dry run 只記錄可辨識的提示，不會自動送鍵；仍可手動確認。
 設定只從你明確傳入的檔案載入，不會從專案自動搜尋：
 
 ```powershell
-& 'C:\tools\codex-autoaccept-cli-0.1.15\codex-auto.cmd' --config 'C:\tools\codex-autoaccept-cli-0.1.15\config.example.json' --auto
+& 'C:\tools\codex-autoaccept-cli-0.1.16\codex-auto.cmd' --config 'C:\tools\codex-autoaccept-cli-0.1.16\config.example.json' --auto
 ```
 
 JSON 支援 `enabled`、`dryRun`、`approveFileChanges`、`expandLongCommands`、`logMaxBytes`、`logBackupCount`、`allowPatterns`、`denyPatterns`。規則是 JavaScript regex，不是 glob；無效 JSON、型別或 regex 會在啟動 Codex 前拒絕啟動。變更檔案後需重新啟動；Ctrl+] 的狀態不會寫回檔案。
@@ -128,6 +128,25 @@ Get-Content "$env:LOCALAPPDATA\CodexAutoAccept\cli.log" -Tail 20 -Wait
 ## 0.1.5：移除互動畫面的自動診斷輸出
 
 不再把 MANUAL／UNRECOGNIZED 寫入正在使用的 Codex terminal，以免診斷占用畫面、干擾 TUI 或讓使用者誤判操作狀態。所有自動決策與辨識診斷只寫入 cli.log；啟動資訊、使用者 Ctrl+] 切換回饋及終止錯誤仍會顯示。保留 0.1.4 的標題重繪修正。
+
+## 0.1.16：B001 細項診斷版
+
+針對已讀完 16 頁後停在 B001 的回報，此版不改變核准／拒絕決策，只增加細項編號，避免在未確認原因前放寬刪除規則。照片未顯示全部腳本，目前不能確認是實際刪除操作或文字誤判。
+
+例如 log 會變成 `MANUAL expanded approval: deny rule; rules=B001:windows-file-delete; details=B001.06`。
+
+| 細項編號 | B001 命中的內建關鍵字 |
+| --- | --- |
+| B001.01 | Remove-Item |
+| B001.02 | ri |
+| B001.03 | del |
+| B001.04 | erase |
+| B001.05 | rmdir |
+| B001.06 | rd |
+
+同時命中多項會列出全部編號；不記錄命令、路徑、匹配片段或使用者自訂 regex。細項編號只表示文字命中，不能單憑它認定真的執行刪除。一般核准與展開核准都會記錄，並受原有 log 輪替上限管理。
+
+71 項本機測試通過，包含六項編號、同時命中、變數排除、診斷隱私及原有核准行為。若遇到同樣中斷，提供最後含 `details=` 的紀錄即可；不用提供公司命令全文。此版是用來定位最新案例的診斷版，尚未宣稱已修正該次中斷。
 
 ## 0.1.15：修正 B005 把報告文字串成危險 Git 指令
 

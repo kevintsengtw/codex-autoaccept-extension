@@ -2,6 +2,29 @@ const test=require('node:test');
 const assert=require('node:assert/strict');
 const {evaluate,describe}=require('../lib/policy');
 const config={allowPatterns:[],denyPatterns:[]};
+test('B001 diagnostics identify each alias with only stable static detail IDs',()=>{
+  const aliases=['Remove-Item','ri','del','erase','rmdir','rd'];
+  aliases.forEach((name,index)=>{
+    const d=evaluate(`${name} 'PRIVATE_CUSTOMER_PATH'`,config);
+    assert.equal(d.allow,false);
+    assert.deepEqual(d.details,[`B001.${String(index+1).padStart(2,'0')}`]);
+    assert.equal(describe(d).includes('PRIVATE_CUSTOMER_PATH'),false);
+    assert.deepEqual(d,{allow:false,reason:'deny rule',rules:[{id:'B001',category:'windows-file-delete'}],
+      details:[`B001.${String(index+1).padStart(2,'0')}`]});
+  });
+  const multiple=evaluate('$rd = 1; Remove-Item example; rd example; del example',config);
+  assert.deepEqual(multiple.details,['B001.01','B001.03','B001.06']);
+  assert.equal(evaluate('$rd = 1; Write-Output $rd',config).allow,true);
+});
+test('diagnostic detail preserves conservative decisions on ambiguous literal and path text',()=>{
+  for(const text of ["Write-Output 'Remove-Item was not executed'", "Get-Content 'evidence/rd/report.json'"]){
+    const d=evaluate(text,config);assert.equal(d.allow,false);
+    assert.ok(d.details.length); // Diagnostics do not silently waive existing policy.
+  }
+  const d=evaluate('git reset --hard',config);
+  assert.equal(d.details,undefined);
+  assert.equal(describe(d),'deny rule; rules=B005:git-destructive');
+});
 test('B005 does not join Git report prose and later metadata into a destructive command',()=>{
   const report=`$lines = @('No Git write command was executed',
     'report covers reset, clean and push status', 'evidence: 06-preflight-inventory.stdout.txt');
@@ -98,7 +121,7 @@ test('multiple rules and user-defined matches return no command, path or regex t
   const d=evaluate(`Remove-Item -Recurse "${secret}"; git reset --hard; ${pattern}`,{...config,denyPatterns:[pattern]});
   assert.deepEqual(d.rules,[{id:'B001',category:'windows-file-delete'},{id:'B005',category:'git-destructive'},{id:'D001',category:'user-defined'}]);
   const diagnostic=describe(d);
-  assert.equal(diagnostic,'deny rule; rules=B001:windows-file-delete,B005:git-destructive,D001:user-defined');
+  assert.equal(diagnostic,'deny rule; rules=B001:windows-file-delete,B005:git-destructive,D001:user-defined; details=B001.01');
   for(const value of [secret,pattern,'Remove-Item','reset --hard']) assert.equal(JSON.stringify(d).includes(value),false);
 });
 test('custom indexes, invalid regex and allowlisted commands preserve policy behavior privately',()=>{

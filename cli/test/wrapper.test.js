@@ -155,7 +155,7 @@ test('incomplete menu logs metadata and remains manual until complete',async t=>
 test('wrapped destructive commands and clipped content still stay manual',async t=>{
   const {s,sent,logs}=session(t);s.resize(28,40);
   s.feed('\x1b[2J\x1b[H'+prompt('Remove-Item -Recurse company-folder'));await sleep(330);
-  assert.deepEqual(sent,[]);assert.deepEqual(logs[0],['MANUAL','deny rule; rules=B001:windows-file-delete']);
+  assert.deepEqual(sent,[]);assert.deepEqual(logs[0],['MANUAL','deny rule; rules=B001:windows-file-delete; details=B001.01']);
   s.feed('\x1b[2J\x1b[H'+prompt('echo clipped…'));await sleep(330);
   assert.deepEqual(sent,[]);assert.equal(logs.at(-1)[1],'clipped content');
 });
@@ -218,7 +218,7 @@ test('dangerous command on previously wrapped rows remains manual',async t=>{
   const rows=prompt('pwsh -Command "Remove-Item -Recurse x"').split('\r\n');
   rows.forEach((line,i)=>s.feed(`\x1b[${i+2};1H${line.padEnd(119)}`));
   s.feed(`\x1b[${rows.length+2};1H\x1b[J`);
-  await sleep(330);assert.deepEqual(sent,[]);assert.deepEqual(logs.at(-1),['MANUAL','deny rule; rules=B001:windows-file-delete']);
+  await sleep(330);assert.deepEqual(sent,[]);assert.deepEqual(logs.at(-1),['MANUAL','deny rule; rules=B001:windows-file-delete; details=B001.01']);
 });
 test('standalone dollar marker is followed by full execution content and policy',()=>{
   const {detect}=require('../lib/detector');
@@ -249,7 +249,7 @@ test('physical fallback never bypasses deny policy on the recovered execution',a
   const rows=full.split('\r\n');
   rows.forEach((line,i)=>s.feed(`\x1b[${i+2};1H${line.padEnd(119)}`));
   s.feed(`\x1b[${rows.length+2};1H\x1b[J`);await sleep(330);
-  assert.deepEqual(sent,[]);assert.deepEqual(logs.at(-1),['MANUAL','deny rule; rules=B001:windows-file-delete']);
+  assert.deepEqual(sent,[]);assert.deepEqual(logs.at(-1),['MANUAL','deny rule; rules=B001:windows-file-delete; details=B001.01']);
 });
 test('a known hidden-lines footer does not allow unseen command content',()=>{
   const {detect}=require('../lib/detector');

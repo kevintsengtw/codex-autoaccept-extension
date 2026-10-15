@@ -23,6 +23,9 @@ const RULE_CATEGORIES = [
   'git-destructive', 'destructive-sql', 'system-operation', 'raw-disk-write',
   'world-writable-permissions', 'remote-script-execution', 'infrastructure-delete'
 ];
+const WINDOWS_DELETE_DETAILS = ['Remove-Item','ri','del','erase','rmdir','rd'].map((name,index)=>({
+  id:`B001.${String(index+1).padStart(2,'0')}`, re:new RegExp(`\\b${name}\\b`,'i')
+}));
 function withoutPowerShellVariables(text) {
   // B001 lists command aliases (rd, ri, del...), not variable names. Preserve
   // the original text for all other rules and user-defined patterns.
@@ -43,13 +46,17 @@ function evaluate(text, settings) {
     // matching text, paths, input snippets or RegExp match objects.
     const rules = denied.filter(rule => (rule.id === 'B001' ? commandCandidates : candidates).some(s => rule.re.test(s)))
       .map(({id, category}) => ({id, category}));
-    if (rules.length) return {allow: false, reason: 'deny rule', rules};
+    if (rules.length) {
+      const details = rules.some(rule=>rule.id==='B001') ? WINDOWS_DELETE_DETAILS
+        .filter(detail=>commandCandidates.some(candidate=>detail.re.test(candidate))).map(detail=>detail.id) : [];
+      return {allow:false,reason:'deny rule',rules,...(details.length ? {details} : {})};
+    }
     if (allowed.length && !allowed.some(re => re.test(text))) return {allow: false, reason: 'not allowlisted'};
     return {allow: true, reason: 'recognized approval'};
   } catch { return {allow: false, reason: 'invalid regular expression'}; }
 }
 function describe(outcome) {
   if (!outcome.rules?.length) return outcome.reason;
-  return `${outcome.reason}; rules=${outcome.rules.map(rule => `${rule.id}:${rule.category}`).join(',')}`;
+  return `${outcome.reason}; rules=${outcome.rules.map(rule => `${rule.id}:${rule.category}`).join(',')}${outcome.details?.length ? `; details=${outcome.details.join(',')}` : ''}`;
 }
 module.exports = {evaluate, describe, BUILTIN_DENY, RULE_CATEGORIES};
