@@ -29,6 +29,7 @@ internal sealed class ReadableLog
     readonly Dictionary<string,string> eventKeys = new Dictionary<string,string>();
     readonly Dictionary<string,long> scanWrittenAt = new Dictionary<string,long>();
     readonly Dictionary<string,long> eventWrittenAt = new Dictionary<string,long>();
+    readonly Dictionary<string,long> nodeRecoveryWrittenAt = new Dictionary<string,long>();
     readonly Stopwatch uptime = Stopwatch.StartNew();
     readonly Func<long> elapsedMilliseconds;
     const long REPEAT_INTERVAL_MS = 10000;
@@ -127,6 +128,33 @@ internal sealed class ReadableLog
         viewBriefs[view]="視窗："+ViewText(m.Mode,m.WindowState)+"；候選："+(m.Request>0?"P"+m.Request.ToString("D6"):"未建立")
             +"\r\n回報碼：0310-"+view+"-"+code+"\r\n結果："+text+"\r\n\r\n";
         return block;
+    }
+    public string NodeRecovery(NodeBudgetChange change,ScanStage stage,string mode,string size)
+    {
+        // Accept only the bounded production recovery ladder and fixed state tokens.
+        // Do not let malformed inputs or provider/UI strings reach the exported log.
+        if(change==null || (change.Origin!=ScanOrigin.UIA && change.Origin!=ScanOrigin.MSAA)
+            || (stage!=ScanStage.Scan && stage!=ScanStage.Revalidation)
+            || !(change.PreviousLimit==3000 && change.NextLimit==6000
+                || change.PreviousLimit==6000 && change.NextLimit==10000
+                || change.PreviousLimit==10000 && change.NextLimit==10000)
+            || !(mode=="UNKNOWN" && size=="UNKNOWN" || mode=="MINIMIZED" && size=="MINIMIZED"
+                || (mode=="FOREGROUND" || mode=="BACKGROUND") && (size=="NORMAL" || size=="MAXIMIZED"))) return null;
+        string origin=change.Origin==ScanOrigin.UIA?"UIA":"MSAA";
+        string scanStage=stage==ScanStage.Scan?"初掃":"重驗";
+        string key=View(mode,size)+"/"+origin+"/"+scanStage+"/"+change.PreviousLimit+"/"+change.NextLimit;
+        long now=elapsedMilliseconds(),written;
+        if(nodeRecoveryWrittenAt.TryGetValue(key,out written)
+            && (change.Expanded || now-written<REPEAT_INTERVAL_MS)) return null;
+        nodeRecoveryWrittenAt[key]=now;
+        string text="掃描未完成：節點數超過完整掃描上限；"+(change.Expanded
+            ?"擴大上限，下輪從根元素完整重掃":"已達最高上限，本輪拒絕核准");
+        string detail="掃描來源："+origin+"；掃描階段："+scanStage
+            +"\r\n舊節點上限："+change.PreviousLimit.ToString(System.Globalization.CultureInfo.InvariantCulture)
+            +"；新節點上限："+change.NextLimit.ToString(System.Globalization.CultureInfo.InvariantCulture)
+            +"\r\n掃描是否完整：否；本輪部分資料不供核准，後續仍須完成初掃及核准前重驗。"
+            +"\r\n本輪是否呼叫 Invoke：否。";
+        return Block(mode,size,0,"自動模式：節點上限恢復（"+scanStage+"）",text,"R13",detail,true,false);
     }
     public string Event(string kind,long request,string mode,string size,string reason=null)
         => EventCore(kind,request,mode,size,reason,null);

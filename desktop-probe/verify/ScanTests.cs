@@ -19,3 +19,4 @@ var changing = new ScanMetrics { Mode="BACKGROUND",Result="COMPLETE",Reason="NON
 Check(ScanMetrics.Parse(changing.Encode())!=null,"live property changes do not falsely discard bounded scan metadata");
 Check(!fg.Display.Contains("允許一次") && !fg.Display.Contains("SECRET"),"display contains only counts and fixed codes");
 Console.WriteLine("PASS: scan protocol bounds/privacy, missing background approval, native blockers, incomplete/transition scans and live-property races.");
+NodeRecoveryTests.Run();

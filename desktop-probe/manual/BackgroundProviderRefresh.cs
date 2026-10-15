@@ -10,67 +10,64 @@ using Accessibility;
 // may select and validate an approval button.
 internal static class BackgroundProviderRefresh
 {
-    sealed class Pending { public IAccessible Node; public int Depth; }
-
     public static void Read(IntPtr target, int maxDepth, int maxNodes)
     {
         var iid = new Guid("618736e0-3c3d-11cf-810c-00aa00389b71");
-        object root;
-        Marshal.ThrowExceptionForHR(AccessibleObjectFromWindow(target, unchecked((uint)-4), ref iid, out root));
+        object root = null;
         var retained = new HashSet<object>();
         try
         {
+            int result = AccessibleObjectFromWindow(target, unchecked((uint)-4), ref iid, out root);
+            if (root != null && Marshal.IsComObject(root)) retained.Add(root);
+            Marshal.ThrowExceptionForHR(result);
             var accessible = root as IAccessible;
-            if (accessible == null) throw new InvalidOperationException("Missing accessibility client root.");
-            retained.Add(accessible);
-            var stack = new Stack<Pending>();
-            var visited = new HashSet<object>();
-            var documents = new List<IAccessible>();
-            stack.Push(new Pending { Node = accessible });
-            int count = 0;
-            while (stack.Count != 0)
-            {
-                var item = stack.Pop();
-                if (++count > maxNodes || !visited.Add(item.Node)) throw new InvalidOperationException("Accessibility traversal limit or repeated object.");
-                if (Equals(item.Node.get_accRole(0), 15)) // ROLE_SYSTEM_DOCUMENT
-                {
-                    documents.Add(item.Node);
-                    continue; // Refresh root documents; never walk their chat text.
-                }
-                int children = item.Node.accChildCount;
-                if (children < 0 || children > maxNodes - count || children > 0 && item.Depth >= maxDepth)
-                    throw new InvalidOperationException("Accessibility traversal limit.");
-                if (children == 0) continue;
-                var values = new object[children]; int obtained;
-                Marshal.ThrowExceptionForHR(AccessibleChildren(item.Node, 0, children, values, out obtained));
-                foreach (var value in values) if (value != null && Marshal.IsComObject(value)) retained.Add(value);
-                if (obtained != children) throw new InvalidOperationException("Incomplete accessibility traversal.");
-                foreach (var value in values)
-                {
-                    var child = value as IAccessible;
-                    if (child != null) stack.Push(new Pending { Node = child, Depth = item.Depth + 1 });
-                    else if (!(value is int) || ++count > maxNodes) throw new InvalidOperationException("Invalid accessibility child.");
-                }
-            }
-            if (documents.Count == 0) throw new InvalidOperationException("Missing accessibility document.");
+            if (accessible == null) throw ReadFailure();
+            var documents = AccessibleRefreshScan.CollectDocuments(accessible, maxDepth, maxNodes,
+                node => Equals(node.get_accRole(0), 15), // ROLE_SYSTEM_DOCUMENT
+                node => node.accChildCount,
+                (node, children) => ReadChildren(node, children, retained));
             foreach (var document in documents)
             {
                 IntPtr owner;
                 Marshal.ThrowExceptionForHR(WindowFromAccessibleObject(document, out owner));
                 if (owner == IntPtr.Zero || owner != target && GetAncestor(owner, 2) != target)
-                    throw new InvalidOperationException("Accessibility document left target window.");
+                    throw ReadFailure();
                 int x, y, width, height;
                 document.accLocation(out x, out y, out width, out height, 0);
-                if (width <= 0 || height <= 0) throw new InvalidOperationException("Missing accessibility document bounds.");
+                if (width <= 0 || height <= 0) throw ReadFailure();
                 object hit = document.accHitTest(checked(x + width / 2), checked(y + height / 2));
                 if (hit != null && Marshal.IsComObject(hit)) retained.Add(hit);
             }
         }
+        catch (ScanFailureException) { throw; }
+        catch (Exception) { throw ReadFailure(); }
         finally
         {
             foreach (var value in retained) Marshal.ReleaseComObject(value);
         }
     }
+
+    static IReadOnlyList<AccessibleRefreshChild<IAccessible>> ReadChildren(IAccessible node, int children, HashSet<object> retained)
+    {
+        var values = new object[children];
+        int obtained;
+        int result = AccessibleChildren(node, 0, children, values, out obtained);
+        foreach (var value in values) if (value != null && Marshal.IsComObject(value)) retained.Add(value);
+        Marshal.ThrowExceptionForHR(result);
+        if (obtained != children) throw ReadFailure();
+        var entries = new AccessibleRefreshChild<IAccessible>[children];
+        for (int i = 0; i < values.Length; i++)
+        {
+            var child = values[i] as IAccessible;
+            if (child != null) entries[i] = new AccessibleRefreshChild<IAccessible>(child);
+            else if (values[i] is int) entries[i] = new AccessibleRefreshChild<IAccessible>();
+            else throw ReadFailure();
+        }
+        return entries;
+    }
+
+    static ScanFailureException ReadFailure()
+    { return new ScanFailureException(ScanFailureReason.READ, ScanOrigin.MSAA); }
 
     [DllImport("oleacc.dll")] static extern int AccessibleObjectFromWindow(IntPtr hwnd, uint objectId, ref Guid iid, [MarshalAs(UnmanagedType.Interface)] out object value);
     [DllImport("oleacc.dll")] static extern int AccessibleChildren(IAccessible parent, int start, int count, [Out, MarshalAs(UnmanagedType.LPArray, SizeParamIndex = 2)] object[] children, out int obtained);

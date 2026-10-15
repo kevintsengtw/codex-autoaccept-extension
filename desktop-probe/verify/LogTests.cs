@@ -73,6 +73,58 @@ Check(fileCauses.LocalLogFailure("BACKGROUND","NORMAL","SUMMARY_REPLACE",32)!=nu
 var securityFailure=new LogWriteFailure("MAIN_APPEND",new System.Security.SecurityException("PRIVATE_SECURITY_MESSAGE"));
 Check(securityFailure.NativeError==-1 && !securityFailure.Message.Contains("PRIVATE"),"non-Win32 security HRESULT does not invent a Win32 error or expose its message");
 Check(new ReadableLog().LocalLogFailure("BACKGROUND","MAXIMIZED",securityFailure.Stage,securityFailure.NativeError).Contains("Win32）：未確認"),"unknown native file cause remains explicitly unconfirmed");
+long recoveryClock=0;
+var recoveryLog=new ReadableLog(()=>recoveryClock);
+var firstGrowth=new NodeBudgetChange(3000,6000,ScanOrigin.UIA);
+var secondGrowth=new NodeBudgetChange(6000,10000,ScanOrigin.UIA);
+var atMaximum=new NodeBudgetChange(10000,10000,ScanOrigin.UIA);
+var growthOne=recoveryLog.NodeRecovery(firstGrowth,ScanStage.Scan,"BACKGROUND","MAXIMIZED");
+Check(growthOne.Contains("0310-BX-R13") && growthOne.Contains("掃描來源：UIA；掃描階段：初掃")
+    && growthOne.Contains("舊節點上限：3000；新節點上限：6000") && growthOne.Contains("從根元素完整重掃")
+    && growthOne.Contains("本輪是否呼叫 Invoke：否") && growthOne.Contains("核准前重驗"),
+    "first bounded recovery retains NODE_LIMIT code and explicitly requires fresh scan/revalidation without invoking");
+recoveryClock=1;
+var growthTwo=recoveryLog.NodeRecovery(secondGrowth,ScanStage.Scan,"BACKGROUND","MAXIMIZED");
+Check(growthTwo!=null && growthTwo.Contains("舊節點上限：6000；新節點上限：10000"),
+    "both growth steps remain visible inside the ten-second repeated-state interval");
+Check(recoveryLog.NodeRecovery(firstGrowth,ScanStage.Scan,"BACKGROUND","MAXIMIZED")==null
+    && recoveryLog.NodeRecovery(secondGrowth,ScanStage.Scan,"BACKGROUND","MAXIMIZED")==null,
+    "repeated identical growth notices do not duplicate a completed budget change");
+var hardLimit=recoveryLog.NodeRecovery(atMaximum,ScanStage.Scan,"BACKGROUND","MAXIMIZED");
+Check(hardLimit.Contains("0310-BX-R13") && hardLimit.Contains("已達最高上限，本輪拒絕核准")
+    && hardLimit.Contains("舊節點上限：10000；新節點上限：10000") && hardLimit.Contains("掃描是否完整：否"),
+    "hard cap remains an incomplete NODE_LIMIT rejection, never an approval");
+recoveryClock=10000;
+Check(recoveryLog.NodeRecovery(atMaximum,ScanStage.Scan,"BACKGROUND","MAXIMIZED")==null,
+    "hard cap notice coalesces until ten seconds from its own last write");
+recoveryLog.Event("WAIT_PREVIOUS",1,"BACKGROUND","MAXIMIZED");
+recoveryLog.Scan(empty,false);
+recoveryLog.Status("STATUS: ON");
+Check(recoveryLog.NodeRecovery(atMaximum,ScanStage.Scan,"BACKGROUND","MAXIMIZED")==null,
+    "intervening scan, event and ON do not bypass the hard-cap notice throttle");
+recoveryClock=10001;
+Check(recoveryLog.NodeRecovery(atMaximum,ScanStage.Scan,"BACKGROUND","MAXIMIZED")!=null,
+    "continued hard-cap rejection remains visible at a bounded ten-second cadence");
+var revalidationRecovery=recoveryLog.NodeRecovery(new NodeBudgetChange(3000,6000,ScanOrigin.MSAA),ScanStage.Revalidation,"BACKGROUND","NORMAL");
+Check(revalidationRecovery.Contains("0310-BN-R13") && revalidationRecovery.Contains("掃描來源：MSAA；掃描階段：重驗"),
+    "MSAA and revalidation have fixed, distinct recovery descriptions");
+string recoverySummary=recoveryLog.Summary;
+Check(recoverySummary.Contains("0310-BN-R13") && recoverySummary.Contains("尚未記錄核准嘗試"),
+    "recovery updates the issue summary without claiming an approval attempt");
+Check(recoveryLog.NodeRecovery(null,ScanStage.Scan,"BACKGROUND","MAXIMIZED")==null
+    && recoveryLog.NodeRecovery(new NodeBudgetChange(3000,6000,(ScanOrigin)99),ScanStage.Scan,"BACKGROUND","MAXIMIZED")==null
+    && recoveryLog.NodeRecovery(firstGrowth,(ScanStage)99,"BACKGROUND","MAXIMIZED")==null
+    && recoveryLog.NodeRecovery(new NodeBudgetChange(-1,6000,ScanOrigin.UIA),ScanStage.Scan,"BACKGROUND","MAXIMIZED")==null
+    && recoveryLog.NodeRecovery(new NodeBudgetChange(3000,10001,ScanOrigin.UIA),ScanStage.Scan,"BACKGROUND","MAXIMIZED")==null
+    && recoveryLog.NodeRecovery(new NodeBudgetChange(3000,10000,ScanOrigin.UIA),ScanStage.Scan,"BACKGROUND","MAXIMIZED")==null
+    && recoveryLog.NodeRecovery(new NodeBudgetChange(6000,3000,ScanOrigin.UIA),ScanStage.Scan,"BACKGROUND","MAXIMIZED")==null
+    && recoveryLog.NodeRecovery(new NodeBudgetChange(6000,6000,ScanOrigin.UIA),ScanStage.Scan,"BACKGROUND","MAXIMIZED")==null
+    && recoveryLog.NodeRecovery(firstGrowth,ScanStage.Scan,"PRIVATE_UI_COMMAND","MAXIMIZED")==null
+    && recoveryLog.NodeRecovery(firstGrowth,ScanStage.Scan,"BACKGROUND",@"C:\PRIVATE_PROVIDER_MESSAGE")==null
+    && recoveryLog.NodeRecovery(firstGrowth,ScanStage.Scan,"MINIMIZED","MAXIMIZED")==null,
+    "recovery accepts only fixed origin/stage/view tokens and the bounded monotonic ladder");
+Check(recoveryLog.Summary==recoverySummary && !recoveryLog.Summary.Contains("PRIVATE")
+    && !recoveryLog.Summary.Contains(@"C:\"),"invalid recovery input cannot expose UI/provider content or alter exported summaries");
 if (OperatingSystem.IsWindows())
 {
     string writerRoot=Path.GetFullPath(Path.Combine(Path.GetTempPath(),"codex-log-tests-"+Guid.NewGuid().ToString("N")));

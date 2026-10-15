@@ -27,13 +27,13 @@ internal static class ManualProgram
         public long Request;
         public string Mode, WindowState;
     }
-    sealed class Pending { public AutomationElement Element; public int Depth; }
     static IntPtr hwnd;
     static int targetPid, depth = 60, nodes = 3000, timeout = 45;
     static long processStarted;
     static string rootId, log;
     static volatile bool invocationStarted;
-    static bool auto, headless, observationOnly;
+    static bool auto, headless, observationOnly, nodesExplicit;
+    static NodeScanBudget nodeBudget;
     static string startupFailure, lastUiaState;
     static bool lastScanVisible, lastScanApprovalPresent, lastScanUsable, previousAttemptPresent = true;
     static string previousAttemptId;
@@ -63,12 +63,13 @@ internal static class ManualProgram
                 {
                     case "--hwnd": hwnd = new IntPtr(long.Parse(args[i], CultureInfo.InvariantCulture)); break;
                     case "--max-depth": n = int.Parse(args[i]); if (n < 1 || n > 100) throw new ArgumentException("Invalid depth."); depth = n; break;
-                    case "--max-nodes": n = int.Parse(args[i]); if (n < 1 || n > 10000) throw new ArgumentException("Invalid node budget."); nodes = n; break;
+                    case "--max-nodes": n = int.Parse(args[i]); if (n < 1 || n > 10000) throw new ArgumentException("Invalid node budget."); nodes = n; nodesExplicit = true; break;
                     case "--timeout": n = int.Parse(args[i]); if (n < 5 || n > 120) throw new ArgumentException("Invalid timeout."); timeout = n; break;
                     default: throw new ArgumentException("Unknown option.");
                 }
             }
             if (observationOnly && !headless) throw new ArgumentException("Observation requires headless mode.");
+            nodeBudget = new NodeScanBudget(nodes, auto, observationOnly, nodesExplicit);
             autoGate = new AutoGate(observationOnly);
             if (hwnd == IntPtr.Zero || !IsWindow(hwnd)) throw new ArgumentException("A live target HWND is required. Start via Run-Manual-Once.cmd.");
             uint pid; GetWindowThreadProcessId(hwnd, out pid); targetPid = (int)pid;
@@ -203,23 +204,33 @@ internal static class ManualProgram
             long request = 0;
             string mode = "UNKNOWN", windowState = "UNKNOWN";
             string failureStage="READ";
+            var scanStage = ScanStage.Scan;
             try
             {
-                var candidate = Timed(() => Scan(false), "auto scan");
-                if (observationOnly) { Thread.Sleep(1500); continue; } // Cannot enter invocation path; gate also refuses ON.
-                if (autoGate.AwaitingAbsence && BackgroundPolicy.NewCycle(lastScanUsable, previousAttemptPresent,
-                    candidate != null && candidate.Id != previousAttemptId)) { autoGate.Completed(); requestTrace.End(previousRequest); }
-                bool awaiting = autoGate.AwaitingAbsence;
-                autoGate.Observe(epoch.Value, !lastScanVisible || lastScanApprovalPresent);
-                if (awaiting && !autoGate.AwaitingAbsence) requestTrace.End(previousRequest);
-                if (candidate == null || autoGate.AwaitingAbsence)
+                var pair = AutoScanCycle.Read(() => Timed(() => Scan(false), "auto scan"), initialCandidate =>
                 {
-                    if (autoGate.AwaitingAbsence) LogEvent("WAIT_PREVIOUS", previousRequest, lastScanMode, lastScanWindowState);
-                    Thread.Sleep(1500); continue;
-                }
-                request=candidate.Request; mode=candidate.Mode; windowState=candidate.WindowState;
-                var fresh = Timed(() => Scan(false), "auto revalidation",request);
-                if (fresh == null || !Same(candidate, fresh)) { LogEvent(fresh==null?"RECHECK_MISSING":"RECHECK", request, lastScanMode, lastScanWindowState); Thread.Sleep(1500); continue; }
+                    if (observationOnly) return false; // No invocation epoch exists in read-only mode.
+                    if (autoGate.AwaitingAbsence && BackgroundPolicy.NewCycle(lastScanUsable, previousAttemptPresent,
+                        initialCandidate != null && initialCandidate.Id != previousAttemptId)) { autoGate.Completed(); requestTrace.End(previousRequest); }
+                    bool awaiting = autoGate.AwaitingAbsence;
+                    autoGate.Observe(epoch.Value, !lastScanVisible || lastScanApprovalPresent);
+                    if (awaiting && !autoGate.AwaitingAbsence) requestTrace.End(previousRequest);
+                    if (initialCandidate == null || autoGate.AwaitingAbsence)
+                    {
+                        if (autoGate.AwaitingAbsence) LogEvent("WAIT_PREVIOUS", previousRequest, lastScanMode, lastScanWindowState);
+                        return false;
+                    }
+                    request=initialCandidate.Request; mode=initialCandidate.Mode; windowState=initialCandidate.WindowState;
+                    return true;
+                }, () =>
+                {
+                    scanStage = ScanStage.Revalidation;
+                    return Timed(() => Scan(false), "auto revalidation",request);
+                }, Same);
+                if (!pair.Ready) { Thread.Sleep(1500); continue; }
+                var candidate = pair.Candidate;
+                var fresh = pair.Fresh;
+                if (!pair.Unchanged) { LogEvent(fresh==null?"RECHECK_MISSING":"RECHECK", request, lastScanMode, lastScanWindowState); Thread.Sleep(1500); continue; }
                 request=fresh.Request; mode=fresh.Mode; windowState=fresh.WindowState;
                 failureStage="ROOT_READ";
                 Timed(() =>
@@ -279,7 +290,19 @@ internal static class ManualProgram
                 { autoGate.Stop(); Console.WriteLine("AUTO: STOPPED; local log write failed; no new attempt or retry."); break; }
                 if (epoch.HasValue) autoGate.Observe(epoch.Value, true); // Incomplete scans cannot advance a new approval cycle.
                 Console.WriteLine("AUTO: READ/ACTION ERROR; switch unchanged; no duplicate invocation. Error type: " + e.GetBaseException().GetType().Name);
-                try { if (!observationOnly && (committedThisIteration || request>0)) LogEvent(committedThisIteration?"ACTION_ERROR":"VALIDATION_ERROR",request,mode,windowState,failureStage); Status("AUTO: WAITING; will rescan while ON."); }
+                try
+                {
+                    // The failed Timed scan has ended. Only schedule a fresh outer
+                    // iteration; no partial candidate or revalidation is resumed.
+                    nodeBudget.TryRecover(e, committedThisIteration, autoGate, epoch, change =>
+                    {
+                        lock (logSync) AppendLog(readableLog.NodeRecovery(change, scanStage, lastScanMode, lastScanWindowState));
+                    });
+                    var failure = ScanFailureException.From(e);
+                    if (!observationOnly && (committedThisIteration || request>0)) LogEvent(committedThisIteration?"ACTION_ERROR":"VALIDATION_ERROR",request,mode,windowState,
+                        failure != null ? failure.Reason.ToString() : failureStage);
+                    Status("AUTO: WAITING; will rescan while ON.");
+                }
                 catch { autoGate.Stop(); Console.WriteLine("AUTO: STOPPED; status log unavailable."); }
                 Thread.Sleep(1500);
             }
@@ -301,7 +324,14 @@ internal static class ManualProgram
     {
         var metrics = new ScanMetrics { RootOffscreenRead = false };
         try { return ScanCore(metrics, requireCandidate); }
-        catch { metrics.Result = "ERROR"; if (metrics.Reason == "NONE") metrics.Reason = "READ"; throw; }
+        catch (Exception error)
+        {
+            metrics.Result = "ERROR";
+            var failure = ScanFailureException.From(error);
+            if (failure != null) metrics.Reason = failure.Reason.ToString();
+            else if (metrics.Reason == "NONE") metrics.Reason = "READ";
+            throw;
+        }
         finally
         {
             lastScanMode=metrics.Mode; lastScanWindowState=metrics.WindowState;
@@ -320,6 +350,7 @@ internal static class ManualProgram
     }
     static Candidate ScanCore(ScanMetrics metrics, bool requireCandidate)
     {
+        int nodeLimit = nodeBudget.Nodes; // Fixed for both background refresh and this complete UIA scan.
         if (!ValidWindow()) throw new ManualRefusalException("Target window changed.");
         var window = NativeSnapshot();
         MeasureWindow(metrics, window);
@@ -332,7 +363,7 @@ internal static class ManualProgram
             // Read-only provider refresh stays inside this scan's existing timeout.
             // It never selects a candidate or replaces the full revalidation below.
             metrics.Reason = "ROOT_READ";
-            BackgroundProviderRefresh.Read(hwnd, depth, nodes);
+            BackgroundProviderRefresh.Read(hwnd, depth, nodeLimit);
             if (!ValidWindow()) throw new ManualRefusalException("Target window changed during provider refresh.");
         }
         metrics.Reason = "ROOT_READ";
@@ -345,16 +376,12 @@ internal static class ManualProgram
         string currentRoot = Id(root);
         if (rootId == null) rootId = currentRoot;
         else if (rootId != currentRoot) throw new ManualRefusalException("Root changed.");
-        var stack = new Stack<Pending>(); var seen = new HashSet<string>(); var found = new List<Candidate>(); int count = 0, labels = 0;
+        var found = new List<Candidate>(); int labels = 0;
+        var progress = new ScanProgress();
         string labelId = null;
-        stack.Push(new Pending { Element = root });
-        while (stack.Count > 0)
+        var seen = CompleteTreeScan.Run(root, nodeLimit, depth, Id, el =>
         {
-            if (count >= nodes) { metrics.Reason = "NODE_LIMIT"; throw new ManualRefusalException("Node budget reached."); }
-            var item = stack.Pop(); var el = item.Element;
-            string elementId = Id(el);
-            if (!seen.Add(elementId)) { metrics.Reason = "TREE_REPEAT"; throw new ManualRefusalException("Tree repeated an element."); }
-            count++; metrics.Nodes = count;
+            metrics.Nodes = progress.Nodes;
             metrics.Reason = "BUTTON_READ";
             var current = el.Current;
             var type = current.ControlType;
@@ -364,7 +391,7 @@ internal static class ManualProgram
             bool exactLabel = type == ControlType.Button && name == "允許一次";
             if (exactLabel)
             {
-                labels++; metrics.Labels++; lastScanApprovalPresent = true; labelId=elementId;
+                labels++; metrics.Labels++; lastScanApprovalPresent = true; labelId=Id(el);
                 if (current.IsEnabled) metrics.Enabled++;
                 if ((bool)el.GetCurrentPropertyValue(AutomationElement.IsInvokePatternAvailableProperty)) metrics.Invoke++;
             }
@@ -379,22 +406,13 @@ internal static class ManualProgram
             }
             if (exactLabel && eligibilityReason!="NONE") metrics.EligibilityReason=eligibilityReason;
             metrics.Reason = "READ";
-            var child = TreeWalker.RawViewWalker.GetFirstChild(el);
-            if (child != null && item.Depth >= depth) { metrics.Reason = "DEPTH_LIMIT"; throw new ManualRefusalException("Depth budget reached."); }
-            int childCount = 0;
-            while (child != null)
-            {
-                if (++childCount > nodes) { metrics.Reason = "NODE_LIMIT"; throw new ManualRefusalException("Sibling budget reached."); }
-                stack.Push(new Pending { Element = child, Depth = item.Depth + 1 });
-                child = TreeWalker.RawViewWalker.GetNextSibling(child);
-            }
-        }
+        }, el => TreeWalker.RawViewWalker.GetFirstChild(el), el => TreeWalker.RawViewWalker.GetNextSibling(el), progress);
         window = NativeSnapshot();
         MeasureWindow(metrics, window);
         CompleteSnapshot(root, window, metrics);
         MeasureWindow(metrics, window);
         lastScanUsable = BackgroundPolicy.CanScan(window);
-        lastScanVisible = BackgroundPolicy.ProvesAbsence(window, count);
+        lastScanVisible = BackgroundPolicy.ProvesAbsence(window, progress.Nodes);
         previousAttemptPresent = previousAttemptId == null || seen.Contains(previousAttemptId);
         if (auto && initialMode != metrics.Mode)
         { metrics.Result = "BLOCKED"; metrics.Reason = "TRANSITION"; lastScanUsable = lastScanVisible = false; UiaState("WINDOW_TRANSITION"); return null; }
@@ -402,9 +420,9 @@ internal static class ManualProgram
         { metrics.Result = "BLOCKED"; UiaState(window.Minimized ? "MINIMIZED" : window.Cloaked ? "CLOAKED" : !window.Visible ? "WINDOW_HIDDEN" : "NATIVE_STATE_UNAVAILABLE"); return null; }
         metrics.Result = "COMPLETE";
         if (found.Count==1 || labels==1) metrics.Request=requestTrace.Observe(currentRoot+":"+(found.Count==1?found[0].Id:labelId),found.Count==1);
-        if (!auto) Console.WriteLine("Scan complete: nodes={0}, exact usable candidates={1}", count, found.Count);
+        if (!auto) Console.WriteLine("Scan complete: nodes={0}, exact usable candidates={1}", progress.Nodes, found.Count);
         if (!requireCandidate && found.Count == 0)
-        { UiaState(labels > 0 ? "BUTTON_NOT_READY" : window.Minimized ? "MINIMIZED_PROVIDER_LIMITED" : !window.Foreground && (window.RootOffscreen || count <= 1) ? "BACKGROUND_PROVIDER_LIMITED" : "NO_APPROVAL_BUTTON"); return null; }
+        { UiaState(labels > 0 ? "BUTTON_NOT_READY" : window.Minimized ? "MINIMIZED_PROVIDER_LIMITED" : !window.Foreground && (window.RootOffscreen || progress.Nodes <= 1) ? "BACKGROUND_PROVIDER_LIMITED" : "NO_APPROVAL_BUTTON"); return null; }
         if (found.Count != 1) { metrics.Reason = "MULTIPLE"; throw new ManualRefusalException("Requires exactly one candidate."); }
         UiaState(window.Minimized ? "MINIMIZED_CANDIDATE_READY" : window.Foreground ? "CANDIDATE_READY" : "BACKGROUND_CANDIDATE_READY");
         found[0].Request=metrics.Request; found[0].Mode=metrics.Mode; found[0].WindowState=metrics.WindowState;
