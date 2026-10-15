@@ -26,3 +26,7 @@ desktop-probe/tray/obj/
 graphify-out/
 .desktop-test/
 desktop-probe/windows-test-results/
+
+# Independent console-probe 0.2.x builds.
+console-probe/**/bin/
+console-probe/**/obj/

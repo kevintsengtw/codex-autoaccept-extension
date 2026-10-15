@@ -14,7 +14,7 @@
 | --- | --- | --- |
 | [codex-autoaccept-0.1.1.vsix](artifacts/codex-autoaccept-0.1.1.vsix) | 0.1.1 | VS Code 擴充套件 |
 | [codex-autoaccept-cli-windows-0.1.15.zip](artifacts/codex-autoaccept-cli-windows-0.1.15.zip) | 0.1.15 | Windows Terminal 獨立 CLI 測試版 |
-| [codex-uia-probe-windows-0.2.1.zip](artifacts/codex-uia-probe-windows-0.2.1.zip) | 0.2.1 | Windows 桌面 App：UIA 探測、手動單次與控制台 ON／OFF 工具；[操作指南](docs/CODEX_UIA_PROBE_WINDOWS.md) |
+| [codex-uia-probe-windows-0.2.2.zip](artifacts/codex-uia-probe-windows-0.2.2.zip) | 0.2.2 | Windows 桌面 App：UIA 探測、手動單次與控制台 ON／OFF 工具；[操作指南](docs/CODEX_UIA_PROBE_WINDOWS.md) |
 | [SHA256SUMS](artifacts/SHA256SUMS) | — | 成品雜湊值 |
 
 VS Code 版與 Windows CLI 包裝器分別版本化，兩個開關互不連動。本專案目前使用 VSIX 發佈，**尚未上架 VS Code Marketplace**。
@@ -59,7 +59,9 @@ VS Code 版與 Windows CLI 包裝器分別版本化，兩個開關互不連動�
 
 ## Windows UIA Probe：控制台操作工具
 
-[下載 codex-uia-probe-windows 0.2.1](artifacts/codex-uia-probe-windows-0.2.1.zip)，完整解壓後，從一般權限 PowerShell 進入該目錄：
+0.2.2 是從原始 0.2.1 ZIP 修正的獨立控制台支線：超限後完整重掃、保存具體拒絕原因、保留未知結果的去重，並移除 Q 退出後的批次檔 `pause`。原始碼與驗證見 [console-probe](console-probe/README.md)，不影響上方 R11 常駐版；公司 Windows 長時間與 Q 返回 PowerShell 的端到端效果仍待驗證。
+
+[下載 codex-uia-probe-windows 0.2.2](artifacts/codex-uia-probe-windows-0.2.2.zip)，完整解壓後，從一般權限 PowerShell 進入該目錄：
 
 | 模式 | 執行命令 | 用途 |
 | --- | --- | --- |
@@ -69,7 +71,7 @@ VS Code 版與 Windows CLI 包裝器分別版本化，兩個開關互不連動�
 
 需要 Windows 10／11 與 .NET Framework 4.8／4.8.1，不需 Node.js。自動模式每次啟動預設 OFF；控制台必須保持執行。這不是 VS Code／Codex CLI 工具，也不是上方的系統匣 GUI 版。
 
-完整安裝、選取視窗、參數、報告路徑、摘要、結果判讀及移除方式見 **[codex-uia-probe-windows 操作指南](docs/CODEX_UIA_PROBE_WINDOWS.md)**；進階行為見 [Probe 詳細說明](desktop-probe/README.md)。完整 UIA 報告可能含公司資訊，留在本機即可。
+完整安裝、選取視窗、參數、報告路徑、摘要、結果判讀及移除方式見 **[codex-uia-probe-windows 操作指南](docs/CODEX_UIA_PROBE_WINDOWS.md)**；修正版行為見 [控制台詳細說明](console-probe/README.md)。完整 UIA 報告可能含公司資訊，留在本機即可。
 
 ## VS Code 安裝：Codex 側邊欄
 

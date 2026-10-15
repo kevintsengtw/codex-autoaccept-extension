@@ -1,0 +1,29 @@
+{
+  "package": "codex-uia-probe-windows-0.2.1.zip",
+  "sha256": "e063b03c3984c538b286a46d499721e989e97d0b1251f50f04aaf177686bced6",
+  "files": {
+    "Run-Auto-Accept.cmd": "55b5ef522d40676861f2d88e81c0d28a27cf7cbf737d708d387a6d5cd1419cd3",
+    "manual/AutoGate.cs": "d4a38bab02312809b73c8a9ee2c15d8583fdd748067f28aea6df9b86b0727f90",
+    "verify/AutoTests.csproj": "2fd2585f02a51b5a5d375a1fe3109095b91649f3a302b7f1a2b0ea0b997b9a25",
+    "verify/AutoTests.cs": "78fef57010b4b760b2b14115ad1fbc3a06c97572acd6ea1080af64a40a93d5a1",
+    "Run-Manual-Once.cmd": "7a6e7762653b3a46226772b02d4f2ba316f1e85e794b8f6b3bc34fa206167047",
+    "manual/ManualProgram.cs": "785fbee70200ce695f15874e19715c371be73f740c02ef8397d1c2e8847f4fb1",
+    "manual/ManualGate.cs": "fe85dfeba8ae0c2a50918f8aafffcd146502edf346f0c3aa23f5bb0b2144375f",
+    "manual/CodexUiaManualInvoke.csproj": "711fcd3cae6a7e1d9cb9ec54608dcef25b774866fdc862cc4386991cd720fffe",
+    "manual/packages.lock.json": "365e5091202a438fc381fe307ba585f3cbf32ddfe64853ae12ea102fedacaa39",
+    "verify/Directory.Build.props": "d63c146d69d72022be77db6ed91eb0724299d8d252184c3356ef69a8e922a60a",
+    "verify/ManualTests.csproj": "d52c079829c767f162af6e84265e1906a41bdd6644ed92e83d2ff0043edd804a",
+    "verify/ManualTests.cs": "8bf03e81ae2bc531058d7ec91869f37db43c7920a500b44b543c5e2eb546d27c",
+    "Run-Probe.cmd": "011d779faf1389823db9fffa5c847f534a66c59b8b3c04a86ccaa408756d3cf3",
+    "LICENSE": "f6d4d10e893d5d6c5fda1400718baa31efe60c65add7b33288cb1caee36ade8d",
+    "CodexUiaProbe.csproj": "53c8479e6f7d54833c4ffd38b0247d74857b7d55f9fb12f81c2c9cf2c059a9e8",
+    "Program.cs": "87a533e84ecd2807198fabf6ca40b06ccc47f782c8e3e4c297987c2865914d03",
+    "ReportSummary.cs": "c40ac4e9be0889942eb918ee1a4578625fdc2c6620be2f2707be06451ad162ed",
+    "app.manifest": "c74a043b64c518921a11a5a479288ca4047690affaa8ac28de09d8550366719f",
+    "packages.lock.json": "365e5091202a438fc381fe307ba585f3cbf32ddfe64853ae12ea102fedacaa39",
+    "verify/ProbeAudit.csproj": "9c9722c39480a3f1c4141d99c436fa793ca519f564becff38b2e804adc3b90c2",
+    "verify/Program.cs": "e77facce30ee4f0c475abb7d3a02d44d05db78a210eed489525a10f345d92a2e",
+    "verify/SummaryTests.csproj": "c6c3748173e9b6591e8f90535e71ac314d06857b817ef85aa3c9c0f4a2273ab3",
+    "verify/SummaryTests.cs": "03cc9802fe5d3a87b1cd58cc8e4c68c291abf3eb4d3cf058347c2b10803777b5"
+  }
+}
