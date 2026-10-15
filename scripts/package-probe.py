@@ -1,11 +1,16 @@
 """Package the prebuilt Windows UIA probe and explicitly confirmed manual helper; no target execution."""
 from pathlib import Path
+import argparse
 import hashlib
 import zipfile
 
 root = Path(__file__).resolve().parent.parent
 probe = root / "desktop-probe"
-name = "codex-autoaccept-desktop-windows-0.3.7"
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument("--name", default="codex-autoaccept-desktop-windows-0.3.10")
+name = parser.parse_args().name
+if not name.startswith("codex-autoaccept-desktop-windows-0.3.10") or any(c not in "abcdefghijklmnopqrstuvwxyz0123456789.-" for c in name):
+    raise SystemExit("Invalid package name.")
 files = {
     "CodexAutoAcceptDesktop.exe": probe / "tray/bin/Release/net48/CodexAutoAcceptDesktop.exe",
     "CodexAutoAcceptDesktop.exe.config": probe / "tray/bin/Release/net48/CodexAutoAcceptDesktop.exe.config",
@@ -19,10 +24,17 @@ files = {
     "source/verify/LaunchTests.cs": probe / "verify/LaunchTests.cs",
     "source/tray/WorkerDiagnostics.cs": probe / "tray/WorkerDiagnostics.cs",
     "source/manual/ReadableLog.cs": probe / "manual/ReadableLog.cs",
+    "source/manual/LocalLogWriter.cs": probe / "manual/LocalLogWriter.cs",
+    "source/manual/ObservationStep.cs": probe / "manual/ObservationStep.cs",
     "source/verify/LogTests.csproj": probe / "verify/LogTests.csproj",
     "source/verify/LogTests.cs": probe / "verify/LogTests.cs",
     "examples/log-format-example.txt": probe / "examples/log-format-example.txt",
     "source/manual/BackgroundPolicy.cs": probe / "manual/BackgroundPolicy.cs",
+    "source/manual/BackgroundProviderRefresh.cs": probe / "manual/BackgroundProviderRefresh.cs",
+    "source/manual/FocusSafeAutomation.cs": probe / "manual/FocusSafeAutomation.cs",
+    "source/manual/FocusPolicy.cs": probe / "manual/FocusPolicy.cs",
+    "Interop.UIAutomationClient.dll": probe / "manual/bin/Release/net48/Interop.UIAutomationClient.dll",
+    "licenses/Interop.UIAutomationClient.LICENSE.txt": probe / "manual/third-party/Interop.UIAutomationClient.LICENSE.txt",
     "source/manual/PermissionPolicy.cs": probe / "manual/PermissionPolicy.cs",
     "source/manual/HeadlessConsole.cs": probe / "manual/HeadlessConsole.cs",
     "source/tray/DesktopState.cs": probe / "tray/DesktopState.cs",
@@ -59,6 +71,12 @@ files = {
     "LOG_FORMAT.md": probe / "LOG_FORMAT.md",
     "diagnostics/README.md": probe / "README.md",
     "VERIFICATION.md": probe / "VERIFICATION.md",
+    "WINDOWS_HANDOFF.md": probe / "WINDOWS_HANDOFF.md",
+    "WINDOWS_TEST_RESULTS_TEMPLATE.md": probe / "WINDOWS_TEST_RESULTS_TEMPLATE.md",
+    "WINDOWS_TEST_RESULTS_20261013.md": probe / "WINDOWS_TEST_RESULTS_20261013.md",
+    "WINDOWS_TEST_RESULTS_20261013_R3.md": probe / "WINDOWS_TEST_RESULTS_20261013_R3.md",
+    "WINDOWS_TEST_RESULTS_20261013_R4.md": probe / "WINDOWS_TEST_RESULTS_20261013_R4.md",
+    "WINDOWS_TEST_RESULTS_20261014_R11.md": probe / "WINDOWS_TEST_RESULTS_20261014_R11.md",
     "LICENSE": root / "LICENSE",
     "source/CodexUiaProbe.csproj": probe / "CodexUiaProbe.csproj",
     "source/Program.cs": probe / "Program.cs",

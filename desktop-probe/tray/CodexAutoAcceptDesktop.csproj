@@ -1,7 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType><TargetFramework>net48</TargetFramework><LangVersion>latest</LangVersion>
-    <AssemblyName>CodexAutoAcceptDesktop</AssemblyName><Version>0.3.7</Version><Prefer32Bit>false</Prefer32Bit>
+    <AssemblyName>CodexAutoAcceptDesktop</AssemblyName><Version>0.3.10</Version><Prefer32Bit>false</Prefer32Bit>
+    <PlatformTarget>AnyCPU</PlatformTarget>
     <ApplicationIcon>app.ico</ApplicationIcon>
     <ApplicationManifest>../app.manifest</ApplicationManifest><RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
   </PropertyGroup>

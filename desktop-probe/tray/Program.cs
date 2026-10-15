@@ -52,12 +52,11 @@ internal sealed class TrayContext : ApplicationContext
     Icon icon;
     bool busy, exiting, refreshStartup;
     string currentLogName;
-    int sent;
     public TrayContext()
     {
         if (File.Exists(settingsFile))
             try { settings = new JavaScriptSerializer().Deserialize<Settings>(File.ReadAllText(settingsFile)) ?? new Settings(); } catch { }
-        panel.Text = "Codex Auto-Accept 0.3.7"; panel.ClientSize = new Size(620, 470);
+        panel.Text = "Codex Auto-Accept 0.3.10"; panel.ClientSize = new Size(620, 470);
         panel.FormBorderStyle = FormBorderStyle.FixedDialog; panel.MaximizeBox = false; panel.StartPosition = FormStartPosition.CenterScreen;
         panel.Font = new Font("Microsoft JhengHei UI", 10);
         status.SetBounds(20, 20, 500, 35); status.Font = new Font(panel.Font.FontFamily, 16, FontStyle.Bold);
@@ -70,7 +69,7 @@ internal sealed class TrayContext : ApplicationContext
         launch.Text = "測試背景相容啟動"; launch.SetBounds(20, 290, 190, 38); launch.Click += async (s, e) => await LaunchCompatible();
         launchStatus.Text = "本次尚未由工具送出相容啟動。"; launchStatus.SetBounds(220, 285, 380, 75);
         openLog.Text = "開啟本次 log 摘要"; openLog.SetBounds(20,370,220,38); openLog.Click += (s,e) => OpenLog();
-        var logTip = new Label { Text = "紀錄自動保留在本機，可稍後查看。\n回報只需轉抄 log 中的回報碼與結果。", Bounds = new Rectangle(260,365,340,50) };
+        var logTip = new Label { Text = "紀錄自動保留在本機，可稍後查看。\n完整 log 保留原因與核准前後階段。", Bounds = new Rectangle(260,365,340,50) };
         var tip = new Label { Text = "先選擇 App，再開啟 ON。關閉視窗仍常駐；右鍵系統匣可退出。", AutoSize = false };
         tip.SetBounds(20, 430, 580,30);
         panel.Controls.AddRange(new Control[] { status, target, detail, choose, toggle, reconnect, startup, launch, launchStatus, openLog, logTip, tip });
@@ -149,7 +148,7 @@ internal sealed class TrayContext : ApplicationContext
         var previous = selected;
         busy = true; state.Reset(); Render();
         try { await Disconnect(); if (previous != null && SameWindow(previous)) StartWorker(previous); }
-        finally { busy = false; }
+        finally { busy = false; if (!exiting) Render(); }
         if (worker == null) await Attach(); Render();
     }
     static BrowserHost DetectHost(TargetWindow window)
@@ -225,10 +224,11 @@ internal sealed class TrayContext : ApplicationContext
     async Task Attach()
     {
         if (busy || exiting || state.Faulted) return;
+        // A healthy attached worker needs no UI update on each timer tick.
+        if (selected != null && SameWindow(selected)) return;
         busy = true;
         try
         {
-            if (selected != null && SameWindow(selected)) return;
             if (worker != null) await Disconnect();
             if (string.IsNullOrEmpty(settings.TargetPath)) { detail.Text = "請選擇 App 視窗。若路徑讀取受限，下次需重新選擇。"; Render(); return; }
             var windows = await Task.Run(() => Windows().Where(w => string.Equals(w.Path, settings.TargetPath, StringComparison.OrdinalIgnoreCase)).ToList());
@@ -237,7 +237,9 @@ internal sealed class TrayContext : ApplicationContext
             else { detail.Text = windows.Count > 1 ? "找到多個符合視窗，請用「選擇 App 視窗」指定。" : "等待已選過的 App 開啟。"; Render(); }
         }
         catch (Exception e) { detail.Text = "連接失敗：" + e.GetType().Name; state.Disconnected(true); Render(); }
-        finally { busy = false; }
+        // Render() inside the operation disabled the picker while busy. Restore
+        // controls even on the first-run/missing/multiple-window return paths.
+        finally { busy = false; if (!exiting) Render(); }
     }
     void StartWorker(TargetWindow window)
     {
@@ -271,16 +273,18 @@ internal sealed class TrayContext : ApplicationContext
     }
     void Receive(string message, WorkerDiagnostics diagnostics)
     {
+        if (message.StartsWith("LOG_WRITE_WARNING: ")) { detail.Text = "短摘要更新失敗；繼續使用完整主 log，原因已保留在本機。"; Render(); return; }
+        if (message.StartsWith("LOG_WRITE_FAILURE: ")) { state.Disconnected(true); detail.Text = "本機 log 寫入失敗，停止新的核准嘗試。請查看完整主 log；短摘要可能過期。"; Render(); return; }
         if (message.StartsWith("UIA_SCAN: ")) return;
         if (message.StartsWith("LOG_NAME: ")) { currentLogName=diagnostics.LogName; openLog.Enabled=!busy && currentLogName!=null; return; }
         if (message == "READY: OFF") {
-            if (!diagnostics.Compatible) { state.Disconnected(true); detail.Text = "前後端版本不符，請完整解壓 0.3.7 ZIP。"; Send("QUIT"); Render(); return; }
+            if (!diagnostics.Compatible) { state.Disconnected(true); detail.Text = "前後端版本不符，請完整解壓 0.3.10 ZIP。"; Send("QUIT"); Render(); return; }
             state.Connected(); if (state.DesiredOn) Send("ON"); detail.Text = "已連接。每次啟動仍為 OFF；執行紀錄自動保留在本機。"; }
         else if (message == "STATUS: ON" || message == "STATUS: OFF") {
             bool on=message=="STATUS: ON"; state.Acknowledge(on);
             detail.Text=on?"正在監聽，執行紀錄自動保留在本機。":"已關閉自動核准，後續請求保留人工處理。";
         }
-        else if (message == "ATTEMPT: AUTO_INVOKE_ONCE") { sent++; detail.Text = "本次已開始 " + sent + " 次核准嘗試。"; }
+        else if (message == "ATTEMPT: AUTO_INVOKE_ONCE") detail.Text = "已開始一次核准嘗試；結果須看後續工作是否完成。";
         else if (message == "UIA_STATE: BACKGROUND_PROVIDER_LIMITED") detail.Text = "背景監聽中，等待 App 提供可用按鈕；紀錄已保留。";
         else if (message == "UIA_STATE: BACKGROUND_CANDIDATE_READY") detail.Text = "已在背景辨識核准按鈕，不會主動切換前景。";
         else if (message == "UIA_STATE: CLOAKED" || message == "UIA_STATE: WINDOW_HIDDEN") detail.Text = "App 視窗已隱藏或位於其他桌面；等待恢復。";
@@ -295,7 +299,7 @@ internal sealed class TrayContext : ApplicationContext
         else if (message == "UIA_STATE: NO_APPROVAL_BUTTON") detail.Text = "正在監聽，等待可辨識的核准請求。";
         else if (message.StartsWith("AUTO: READ/ACTION ERROR")) detail.Text = "讀取／操作未完成，原因已寫入本機 log；等待重掃。";
         else if (message.StartsWith("AUTO: WAITING")) detail.Text = "等待核准區塊離開或畫面穩定；保持開關狀態。";
-        else if (message.StartsWith("AUTO: CONTINUING")) detail.Text = "本次核准觀察已結束，繼續監聽。累計嘗試 " + sent + " 次。";
+        else if (message.StartsWith("AUTO: CONTINUING")) detail.Text = "本次核准觀察已結束，繼續監聽。";
         else if (message.StartsWith("RESULT: TIMEOUT")) { state.Disconnected(true); detail.Text = "後端逾時，結果可能已生效。請先檢查 App，再重新連接。"; }
         Render();
     }

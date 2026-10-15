@@ -4,11 +4,12 @@ using System.Text.RegularExpressions;
 // Metadata only. Never retain raw stderr, exception messages, UI text or paths.
 internal sealed class WorkerDiagnostics
 {
-    public const string ExpectedVersion = "0.3.7";
+    public const string ExpectedVersion = "0.3.10";
     readonly object sync = new object();
     string version, errorType, failure, probeLevel, targetLevel, probeQuery, targetQuery;
     string logName;
     bool attempted;
+    string logFailureStage;
     public bool Compatible { get { lock (sync) return version == ExpectedVersion; } }
     public string IntegritySummary
     {
@@ -21,6 +22,8 @@ internal sealed class WorkerDiagnostics
     {
         lock (sync)
         {
+            var logFailure = Regex.Match(line,@"^LOG_WRITE_FAILURE: (MAIN_APPEND|SUMMARY_WRITE|SUMMARY_REPLACE):(?:-1|\d{1,5})$");
+            if(logFailure.Success) { logFailureStage=logFailure.Groups[1].Value; errorType="LocalLogWriteFailure"; }
             var logMatch=Regex.Match(line,@"^LOG_NAME: (auto-\d{8}-\d{6}-[a-f0-9]{32}\.txt)$");
             if(logMatch.Success) logName=logMatch.Groups[1].Value;
             if (line.StartsWith("BACKEND_VERSION: "))
@@ -46,7 +49,8 @@ internal sealed class WorkerDiagnostics
     {
         lock (sync)
         {
-            string reason = version != ExpectedVersion ? "後端版本未確認或不符，請完整解壓同一版 ZIP。"
+            string reason = logFailureStage != null ? "本機 log 寫入失敗，後端已停止。請查看完整主 log；短摘要可能過期。"
+                : version != ExpectedVersion ? "後端版本未確認或不符，請完整解壓同一版 ZIP。"
                 : failure == "PROBE_ELEVATED" ? "後端已提升權限，請退出後以一般使用者重新啟動。"
                 : failure == "TARGET_ELEVATED" ? "App 是已提升權限的目標，此一般使用者工具不處理。"
                 : failure == "TARGET_OR_PERMISSION" ? "目標視窗已變更，或前後端與 App 權限不符。"

@@ -1,13 +1,28 @@
 [CmdletBinding()]
-param()
+param([string]$TestTempDirectory)
 
 # Build and check source only. Does not launch the net48 tray/helper/probe
 # against an App. TransportTests launches its own harmless test child.
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
 Get-Command dotnet -ErrorAction Stop | Out-Null
+$originalTestTemp = $env:TEMP
+$originalTestTmp = $env:TMP
 Push-Location $repoRoot
 try {
+    if ([Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT) {
+        if ([string]::IsNullOrWhiteSpace($TestTempDirectory)) {
+            $TestTempDirectory = Join-Path 'C:\Temp' ('codex-autoaccept-checks-' + [Guid]::NewGuid().ToString('N'))
+        }
+        $testTempRoot = [IO.Path]::GetFullPath($TestTempDirectory)
+        if (-not $testTempRoot.StartsWith('C:\Temp\', [StringComparison]::OrdinalIgnoreCase)) {
+            throw 'Windows test temporary files must be under C:\Temp.'
+        }
+        if (Test-Path -LiteralPath $testTempRoot -PathType Leaf) { throw 'Test temporary path is a file.' }
+        [IO.Directory]::CreateDirectory($testTempRoot) | Out-Null
+        $env:TEMP = $testTempRoot
+        $env:TMP = $testTempRoot
+    }
     foreach ($project in @(
         'desktop-probe/CodexUiaProbe.csproj',
         'desktop-probe/manual/CodexUiaManualInvoke.csproj',
@@ -28,4 +43,8 @@ try {
     & dotnet run --project $auditor -- 'desktop-probe/tray/bin/Release/net48/CodexAutoAcceptDesktop.exe' tray
     if ($LASTEXITCODE -ne 0) { throw 'Tray API audit failed.' }
     Write-Host 'PASS: three builds, eleven suites and three API audits. Windows App runtime behavior is not established by these checks.'
-} finally { Pop-Location }
+} finally {
+    $env:TEMP = $originalTestTemp
+    $env:TMP = $originalTestTmp
+    Pop-Location
+}

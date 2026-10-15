@@ -1,4 +1,72 @@
-# Verification — 2026-10-12
+# Verification
+
+## main 整合回歸 — 2026-10-15
+
+先保留本機原有修改，再將 `main` 快轉至遠端 `632550bea90113e4ea70ac34d76c59c8a0abfc75`。保留遠端 CLI 0.1.15 與 UIA 操作指南，兩處衝突以合併桌面 R11 說明及全部成品雜湊處理。本機程式修改、遠端非重疊檔案及 35 筆成品 SHA-256 均已核對；五個新增桌面 ZIP 保留原始位元組，未重新封裝。
+
+整合後的原始碼複製到 `C:\Temp\codex-autoaccept-main-integration-20261015-01\integrated-source` 驗證，測試暫存檔亦位於該獨立驗證目錄內：
+
+- `scripts/check-desktop.ps1`：三個 net48 Release 建置、十一組測試及三項 API 稽核通過。建置零警告／錯誤；PermissionTests 仍有既有 CS0649 警告。
+- 擴充套件 `npm test`：19/19 通過；`npm run check` 與 `npm run build` 通過。
+- CLI `npm --prefix cli test`：69/69 通過，沒有失敗、取消或略過。
+
+本輪沒有重跑真實 App 矩陣或重啟 App。10 月 14 日 R11 結果仍只適用文件所記錄的 App 26.1007.2314.0；本輪執行中的 App 26.1007.9446.0、公司版本及鎖定情境沒有新增驗收結果。下方及逐輪結果文件中的未提交／未推送敘述保留當時狀態，不代表本次整合回歸的 Git 狀態。本輪只進行簽入前驗證，不建立 tag 或 Release。
+
+## 0.3.10 R11 背景不搶焦點修正 — 2026-10-14
+
+核准後端改由同一個 `CUIAutomation8` 用戶端取得所有元素、walker 與 pattern，設定及讀回 `IUIAutomation2.AutoSetFocus=false`，Invoke 前再次讀回，失敗時停止。UIA 工作仍限 MTA；沒有 legacy 用戶端 fallback。既有唯讀 provider 更新、掃描範圍、唯一精確 Button、完整重驗、OFF 代次與去重限制保留。只將 `UIA_E_ELEMENTNOTAVAILABLE` 轉為既有候選失效類型，`TryGetCurrentPattern` 僅將 `UIA_E_NOTSUPPORTED` 視為不支援；其餘失敗仍傳回既有停止流程。
+
+Windows 三個建置、十一組測試與三項 API 稽核通過，另確認含舊 managed Invoke 的負向範例會被拒絕。NuGet 弱點資料來源不可達的 NU1900 與既有 CS0649 警告保留，沒有聲稱零警告或弱點檢查完成。
+
+同一個已解壓且核對雜湊的候選通過 24 個真實背景／最小化案例，每案 20 秒內完成獨立 marker 並只有一次 Invoke；Windows 前景／焦點 WinEvent 與原生狀態觀察沒有 App 搶焦點，六個最小化案例全程維持最小化。前景與 OFF 回歸也通過。App 未重啟。逐案時間、測法、A06／L03 限制與封裝身分見 [R11 結果](WINDOWS_TEST_RESULTS_20261014_R11.md)。以下保留較早候選的失敗與未驗證狀態。
+
+## 0.3.10 核准後觀察分類修正與 R4 基準 — 2026-10-13
+
+R4 已重新確認原生 Computer Use 能讀取並操作專用 auto-accept 工具，R3 當時的授權拒絕不再代表本輪能力。先以未修改的 0.3.9 成品測試實際 App，沒有用修改後程式替代原問題重現。前景一次開 ON 後，三筆不同真實請求均完成各自 marker，工具維持 ON；App 完全遮蔽後才產生的新請求，三案在各自 20 秒觀察期內均未完成。完整主 log 的一般大小背景掃描為 `039-BN-S00`，精確「允許一次」Button 為零，還原前景後才完成。此處定位為候選建立前未提供精確核准 Button；不能由此斷定 renderer 停止，也沒有證明是幾何拒絕或本版修正的核准後例外分類所致。逐案矩陣與觀察限制見 [R4 結果](WINDOWS_TEST_RESULTS_20261013_R4.md)。
+
+本機 App 套件為 `26.1007.2314.0`，與公司固定的 `26.803.81509` 不同。以上屬個人機直接觀察，公司 0.3.7 背景／最小化失敗仍是使用者回報；個人機的通過或失敗不能替代公司版本驗收。main log、摘要、journal、marker 與 producer 時序保留本機，不提交 repository；歷史矩陣畫面直接觀察來自本會話 Computer Use 輸出，未另存本機截圖檔。下方 R3 與更早段落保留當時完整紀錄，不能將歷史限制、後來恢復或不同版本的結果合併成 PASS。
+
+原始碼與可重複程式回歸確認另一項缺陷：0.3.9 的 `Observe` 以同一個 `ElementNotAvailableException` catch 包住候選與根元素／WindowPattern 讀取。若後者失效，可能回傳 `ORIGINAL_ELEMENT_REMOVED` 並錯誤結束去重週期，雖然沒有證據顯示原候選已離開。0.3.10 新增共用 `ObservationStep.ReadOnce`，真正後端與測試直接使用同一實作；根元素 Snapshot 放在候選 catch 外，例外由既有核准後結果觀察流程記 A07，維持結果未知與舊候選去重。production 的候選失效分類固定使用真正 UIA `ElementNotAvailableException`，不將其他例外泛稱為候選消失。
+
+保持既有 RuntimeId → Current → 根元素 Snapshot → 候選 IsOffscreen 讀取順序及五秒觀察期限；最小化仍不查候選 IsOffscreen，手動觀察保留既有屬性順序與回傳 token。AutoGate、OFF 代次撤銷、唯一精確 Button、完整重掃、目標／祖先／局部內容確認、持續 ON、每個週期最多一次 Invoke 及後端逾時均未放寬。切 OFF 不清除已開始嘗試的未知候選，也不能撤回已開始的一次操作。沒有新增診斷面板、輸入／搶前景／還原視窗 API、啟動旗標、提權或網路行為。
+
+在 Windows 執行 `scripts/check-desktop.ps1`，實際退出碼 0：三個 net48 建置、十一組測試及三項成品 API 檢查通過。Manual 與 Auto 測試直接編入共用 production helper，檢查讀取順序、候選與根元素失效的不同處理、其他例外不被吞掉、最小化短路、前景隱藏界線，以及真正 AutoGate 在未知結果、部分 absence、OFF／ON 舊代次下不重送。NU1900 套件弱點資料來源不可達警告與既有 CS0649 欄位警告仍保留，不能記為零警告。
+
+另在 Windows net48 直接連結同一個 production helper、AutoGate 與 BackgroundPolicy，使用 `UIAutomationTypes` 的真正 UIA 例外完成 21 項檢查，退出碼 0。根元素失效經 Task 保留為 `AggregateException`，結果維持未知；`ElementNotEnabledException` 不會被候選失效分類捕捉。這組檢查只呼叫程式 delegate，沒有讀取 App/provider 或呼叫 Invoke，屬程式回歸而非 App 驗收。
+
+三個組件、manifest、前後端版本比對與打包版本一致升至 0.3.10，另建 runtime，保留 0.3.7／0.3.8／0.3.9 基準。R5 已完成稽核初始 OFF、前景一次 ON 三個 marker、部分遮蔽兩種順序各三案，以及一般大小／最大化完全遮蔽既有請求各三案，遮蔽完成案 A08 均轉前景；前景與部分遮蔽新請求保留快速完成／較晚計時限制。最小化既有請求三案有獨立 marker 與單次 M-A01，A08 仍最小化、A06／A05 保留未知結果與舊候選去重，沒有重送。一般大小／最大化完全遮蔽及最小化後的新請求各三案，第一正式 20 秒均沒有 marker、A01 或精確 Button，還原前景後才完成；最小化 root 可見性提示為未讀取，不是假稱讀取失敗。切 OFF 後新請求與重啟後保留既有 pending 亦完成稽核；重啟案具有量測前原生真卡確認，但請求早於重啟，不等於重啟後新請求測法。**本版沒有修好已重現的背景／最小化新請求失敗，公司版本與鎖定未測。** 最終 runtime 狀態與相容啟動等個別案例以 [R4／R5 合併結果](WINDOWS_TEST_RESULTS_20261013_R4.md) 為準，ZIP 封裝另行核對。
+
+普通矩陣結束後的相容冷啟動嘗試為 BLOCKED：唯讀 preflight 通過，one-shot armed 只記到 WAITING_FOR_EXISTING_APP_EXIT；代理的 GUI Quit 使控制會話中斷，沒有 launch stage、沒有相容 profile 真實矩陣。後續唯讀快照中 helper 不在執行，同路徑 App 的四個旗標均為 false。這不建立 watchdog 退出碼、精確退出時點或新 App 啟動來源；單次 ledger 保留，沒有重試或將目前 App 再次關閉。使用者回報 App 被代理關閉，代理承認此操作及其測試目的，不歸咎使用者。
+
+最後在工具 OFF 確認後，只停止本輪 runtime 前後端，原設定排他恢復並核對雜湊；後續唯讀核對再次確認原設定位元組相符。專用遮蔽視窗已關閉，App 保持開啟，main log／摘要／journal／marker／producer 時序與測試證據保留本機，不刪除、不提交或加入 ZIP。歷史矩陣畫面直接觀察來自本會話 Computer Use 工具輸出，沒有另存本機截圖檔，不宣稱有歷史截圖備份或回放能力。此清理不是新的 App 驗收。
+
+其後實際保存一張近期清理前 OFF 的原始 JPEG，僅支持該次 OFF 畫面，不當成歷史矩陣截圖。保存晚於停止，擷取 UTC 未記錄，不能將保存時間當成擷取時間；原始 JPEG 與 metadata 仍只保留本機，不加入 ZIP。
+
+## 0.3.9 再驗證與修正 — 2026-10-13
+
+本輪保留現有未提交的 0.3.8 修改，HEAD 仍為 `da51ea564376ae535651b8318d371f8e1fbc9f07`，工作目錄有修改所以沒有 pull。先從既有 ZIP 重新驗證、解壓 v0.3.7（62 筆內部 hash）；不覆寫 0.3.7 或 0.3.8。原生 Computer Use 能操作實際 App，但重新啟動專用工具後仍回傳 `Computer Use was not approved to use codexautoacceptdesktop`，即使使用者已回覆允許。未繞過拒絕，本輪真實矩陣為 BLOCKED，鎖定與相容啟動未測。詳見 [R3 結果與證據更正](WINDOWS_TEST_RESULTS_20261013_R3.md)。
+
+本輪 App 讀取有回傳，但可及性文字與截圖不一致，未據此確認新的待核准請求或模式；專用聊天狀態另以聊天 API 核對。可呼叫原生 API 不等於本輪 App 狀態已可靠確認。
+
+在修改前用 0.3.8 原始 `LocalLogWriter` 與實際 Windows 唯讀主檔重現未分類 `UnauthorizedAccessException`／Win32 5。修正版在同條件辨識 `MAIN_APPEND:5`。本版分類 I/O、拒絕存取及安全性例外；摘要失敗先寫固定原因到主檔，主檔不可寫才走既有停止新嘗試流程。非 Win32 HRESULT 不假造檔案錯誤碼。主檔及核准操作不重送，摘要原子取代仍只有 32／33 的有限次重試。
+
+為處理前次紀錄缺口，相同掃描與等待狀態滿十秒後於下一次完成掃描／等待事件記新筆，開 ON 後首筆掃描重新記錄；不保證 provider 慢時固定十秒輸出。核准後錯誤保留固定階段，各種檔案錯誤碼不互相合併。沒有加入診斷區或放寬核准條件。前次逐案計時與部分最大化證據不能獨立重算，相關歷史判定附限制保留，不提升失敗為 PASS。
+
+Windows `scripts/check-desktop.ps1` 通過三個建置、十一組測試與三項 API audit。新增實際唯讀主檔／摘要暫存／摘要目的檔、未知 HRESULT、十秒節流邊界、ON 首筆掃描、等待事件、核准後階段及隱私檢查。建置有 NU1900 弱點資料來源不可達警告，測試有既有 CS0649 警告；這些檢查不是公司或真實背景驗收。三個組件、manifest、前後端版本、版本比對及打包均升至 0.3.9。公司版本未測，背景與最小化新請求仍未解決。
+
+## 0.3.8 個人 Windows 真實驗證 — 2026-10-13
+
+本節保留前次歷史紀錄。R3 核對發現逐案 journal 缺少計時起點與部分 App 幾何，且合併的掃描不能逐案關聯；請同時查看上方 R3 結果，不以本節概括文字當成完整驗收。
+
+未修改 v0.3.7 先由既有 ZIP 驗證、解壓並對真實 App 重現；原版首次選視窗受阻，因此正式後端的結果與前端驗收分開。最終 v0.3.8 已使用原生 `@oai/sky` 操作前端選視窗及 ON／OFF，重跑前景、部分／完整遮蔽、最大化、最小化、OFF、還原恢復與保留設定重啟 OFF。完整矩陣與失敗流程更正見 [Windows 測試結果](WINDOWS_TEST_RESULTS_20261013.md)。
+
+本機 App 套件為 `26.1007.2314.0`，與公司 `26.803.81509` 不同。完整遮蔽或最小化後才產生的新請求仍未自動完成；期限後還原可恢復。既有遮蔽請求即使完成，核准呼叫返回後會轉前景。最小化既有請求能完成，但 UIA 舊候選仍可能保留，工具等待去重。鎖定與相容啟動 profile 未測，不能宣稱公司背景問題已修好。
+
+首次選視窗按鈕停用、Windows AnyCPU locked restore、短摘要錯誤中斷監聽已修正；主 log 增加核准前後原生視窗狀態與本機檔案失敗階段。最終成品自然發生 SUMMARY_REPLACE／Win32 1175，主 log 保留後同一後端仍完成真實 marker 並可切 OFF；未重新連接或重送不確定操作。UI 沒有新增診斷區或數字列表，也不要求手動轉抄。
+
+最終 Windows `scripts/check-desktop.ps1` 通過三個建置、十一組測試與三項 API audit；Windows PowerShell 5.1 使用原執行原則與原命令亦通過，實測 EXE 位元組不變。Windows 檔案測試驗證摘要共用衝突、有限次重試、原子舊摘要保留、主檔不重複及摘要失敗繼續。原版 NU1004、第一版候選的摘要故障與覆蓋／清理判定錯誤均保留本機；raw log、截圖與聊天資料不加入 repository。所有實測 v0.3.8 EXE 雜湊記於結果文件；新 ZIP 與內部雜湊另驗證，v0.3.7 ZIP 不變。修改未提交或推送。
+
+## 初始唯讀 probe 驗證 — 2026-10-12
 
 - Cross-built `net48` Release with .NET SDK on macOS: zero warnings/errors.
 - Audited the compiled EXE using `System.Reflection.Metadata`: managed entry point and UIA assembly references present; embedded manifest uses `asInvoker` and `uiAccess=false`; 11 native imports are restricted to window enumeration/metadata and process-token queries; no referenced UIA Invoke, setters, focus, selection, scroll, toggle, move/resize actions or network/input APIs in the audited categories.

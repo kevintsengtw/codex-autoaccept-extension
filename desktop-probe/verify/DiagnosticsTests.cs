@@ -2,14 +2,20 @@ static void Check(bool b, string s) { if (!b) throw new Exception(s); }
 var d = new WorkerDiagnostics();
 Check(!d.Compatible, "no unconfirmed backend accepted");
 d.Read("BACKEND_VERSION: 0.3.0"); Check(!d.Compatible && d.Describe(4).Contains("版本"), "old backend detected");
-d.Read("BACKEND_VERSION: 0.3.7"); Check(d.Compatible, "matching backend");
+d.Read("BACKEND_VERSION: 0.3.10"); Check(d.Compatible, "matching backend");
 d.Read("FAILURE_CODE: IO"); d.Read("Unhandled System.IO.IOException: PRIVATE_ACCOUNT C:\\SECRET_PATH");
 Check(d.Describe(-1).Contains("IOException") && d.Describe(-1).Contains("退出碼 -1"), "exit and type available");
 Check(!d.Describe(-1).Contains("PRIVATE") && !d.Describe(-1).Contains("SECRET"), "no raw exception leakage");
 d.Read("ATTEMPT: AUTO_INVOKE_ONCE"); Check(d.Describe(3).Contains("可能已送出"), "attempt warning scoped to actual attempt");
-var fresh = new WorkerDiagnostics(); fresh.Read("BACKEND_VERSION: 0.3.7"); fresh.Read("FAILURE_CODE: TARGET_OR_PERMISSION");
+var fresh = new WorkerDiagnostics(); fresh.Read("BACKEND_VERSION: 0.3.10"); fresh.Read("FAILURE_CODE: TARGET_OR_PERMISSION");
 Check(fresh.Describe(4).Contains("權限") && fresh.Describe(4).Contains("未記錄"), "startup vs attempted failure");
 Console.WriteLine("PASS: 7 diagnostic checks (version matching, early exit, safe metadata, attempted status).");
+var writerFailure=new WorkerDiagnostics(); writerFailure.Read("BACKEND_VERSION: 0.3.10"); writerFailure.Read("LOG_WRITE_FAILURE: SUMMARY_REPLACE:32");
+Check(writerFailure.Describe(0).Contains("摘要可能過期"),"log failure is explicit even after clean backend exit");
+var unknownWriterFailure=new WorkerDiagnostics(); unknownWriterFailure.Read("BACKEND_VERSION: 0.3.10");
+unknownWriterFailure.Read("LOG_WRITE_FAILURE: MAIN_APPEND:-1");
+Check(unknownWriterFailure.Describe(0).Contains("本機 log 寫入失敗") && unknownWriterFailure.Describe(0).Contains("LocalLogWriteFailure"),
+    "unknown native file error is classified without a stale UIA error type");
 
 fresh.Read("INTEGRITY: probe=medium; target=unavailable");
 fresh.Read("INTEGRITY_QUERY: probe=none:0; target=OpenProcessToken:5");

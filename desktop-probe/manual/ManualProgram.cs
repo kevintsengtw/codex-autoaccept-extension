@@ -10,6 +10,10 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Automation;
+using AutomationElement = FocusSafeAutomation.Element;
+using TreeWalker = FocusSafeAutomation.Walker;
+using InvokePattern = FocusSafeAutomation.InvokePattern;
+using WindowPattern = FocusSafeAutomation.WindowPattern;
 
 internal static class ManualProgram
 {
@@ -46,7 +50,7 @@ internal static class ManualProgram
             headless = args.Contains("--headless");
             if (headless) HeadlessConsole.Configure();
             else Console.OutputEncoding = new UTF8Encoding(false);
-            Console.WriteLine("BACKEND_VERSION: 0.3.7");
+            Console.WriteLine("BACKEND_VERSION: 0.3.10");
             for (int i = 0; i < args.Length; i++)
             {
                 string key = args[i];
@@ -84,6 +88,8 @@ internal static class ManualProgram
             log = Path.Combine(directory, (auto ? "auto-" : "manual-") + DateTime.Now.ToString("yyyyMMdd-HHmmss") + "-" + Guid.NewGuid().ToString("N") + ".txt");
             File.WriteAllText(log, ReadableLog.Header, new UTF8Encoding(true));
             if (headless) Console.WriteLine("LOG_NAME: " + Path.GetFileName(log));
+            Timed(() => { FocusSafeAutomation.Initialize(); return true; }, "UIA client initialization");
+            Console.WriteLine("UIA_CLIENT: CUIAutomation8; AutoSetFocus=false; readback verified.");
             Status(observationOnly ? "MODE: READ_ONLY_OBSERVATION; approval gate permanently OFF." : auto ? "MODE: AUTO ACCEPT; starts OFF." : "MODE: MANUAL SINGLE INVOKE; no automated approvals or retries.");
             Console.WriteLine("Visible context is shown locally only. Log records statuses, not UI text.");
             var title = new StringBuilder(2048); GetWindowText(hwnd, title, title.Capacity);
@@ -238,9 +244,21 @@ internal static class ManualProgram
                         Status("ATTEMPT: AUTO_INVOKE_ONCE");
                         invocationStarted = true; previousAttemptId = candidate.Id; previousAttemptPresent = true; previousRequest=request;
                     }
+                    failureStage="PRE_INVOKE_NATIVE";
+                    var beforeInvoke = NativeSnapshot();
+                    failureStage="INVOKE";
                     InvokeOnce((InvokePattern)pattern);
+                    failureStage="POST_INVOKE_NATIVE";
+                    var afterInvoke = NativeSnapshot();
+                    failureStage="PERSIST_RETURNED";
                     Status("INVOKE: RETURNED");
                     LogEvent("RETURNED",request,mode,windowState);
+                    string transition = !beforeInvoke.NativeKnown || !beforeInvoke.HasForeground || !afterInvoke.NativeKnown || !afterInvoke.HasForeground ? "UNKNOWN"
+                        : afterInvoke.Foreground && (!beforeInvoke.Foreground || beforeInvoke.Minimized) ? "TO_FOREGROUND"
+                        : afterInvoke.Minimized ? (beforeInvoke.Minimized ? "MINIMIZED_RETAINED" : "TO_MINIMIZED")
+                        : afterInvoke.Foreground ? "FOREGROUND_RETAINED" : beforeInvoke.Foreground ? "TO_BACKGROUND" : "BACKGROUND_RETAINED";
+                    LogEvent("WINDOW_AFTER_INVOKE",request,mode,windowState,transition);
+                    failureStage="OBSERVE";
                     string observation = Observe(fresh, true);
                     Status("OBSERVATION: " + observation);
                     if (observation == "ORIGINAL_ELEMENT_REMOVED" || observation == "ORIGINAL_BUTTON_HIDDEN_IN_VISIBLE_WINDOW")
@@ -257,6 +275,8 @@ internal static class ManualProgram
             }
             catch (Exception e)
             {
+                if (e is LogWriteFailure || e is AggregateException && ((AggregateException)e).Flatten().InnerExceptions.Any(error => error is LogWriteFailure))
+                { autoGate.Stop(); Console.WriteLine("AUTO: STOPPED; local log write failed; no new attempt or retry."); break; }
                 if (epoch.HasValue) autoGate.Observe(epoch.Value, true); // Incomplete scans cannot advance a new approval cycle.
                 Console.WriteLine("AUTO: READ/ACTION ERROR; switch unchanged; no duplicate invocation. Error type: " + e.GetBaseException().GetType().Name);
                 try { if (!observationOnly && (committedThisIteration || request>0)) LogEvent(committedThisIteration?"ACTION_ERROR":"VALIDATION_ERROR",request,mode,windowState,failureStage); Status("AUTO: WAITING; will rescan while ON."); }
@@ -307,6 +327,14 @@ internal static class ManualProgram
         lastScanVisible = false; lastScanUsable = false; lastScanApprovalPresent = false; previousAttemptPresent = true;
         if (auto && !BackgroundPolicy.CanScan(window))
         { metrics.Result = "BLOCKED"; UiaState(window.Minimized ? "MINIMIZED" : window.Cloaked ? "CLOAKED" : !window.Visible ? "WINDOW_HIDDEN" : "NATIVE_STATE_UNAVAILABLE"); return null; }
+        if (auto && !window.Foreground)
+        {
+            // Read-only provider refresh stays inside this scan's existing timeout.
+            // It never selects a candidate or replaces the full revalidation below.
+            metrics.Reason = "ROOT_READ";
+            BackgroundProviderRefresh.Read(hwnd, depth, nodes);
+            if (!ValidWindow()) throw new ManualRefusalException("Target window changed during provider refresh.");
+        }
         metrics.Reason = "ROOT_READ";
         var root = AutomationElement.FromHandle(hwnd);
         CompleteSnapshot(root, window, metrics);
@@ -465,19 +493,13 @@ internal static class ManualProgram
         while (DateTime.UtcNow < until)
         {
             if (!ValidWindow()) return "WINDOW_CHANGED; APPROVAL_OUTCOME_UNKNOWN";
-            try
-            {
-                if (Id(candidate.Element) != candidate.Id) return "ELEMENT_CHANGED; APPROVAL_OUTCOME_UNKNOWN";
-                var c = candidate.Element.Current;
-                if (requireRemoval)
-                {
-                    var window = Snapshot(AutomationElement.FromHandle(hwnd));
-                    if (!window.Minimized && BackgroundPolicy.ProvesHiddenEnd(window, c.IsOffscreen))
-                        return "ORIGINAL_BUTTON_HIDDEN_IN_VISIBLE_WINDOW";
-                }
-                if (!requireRemoval && (!c.IsEnabled || c.IsOffscreen || c.Name != "允許一次")) return "BUTTON_UNAVAILABLE_OR_HIDDEN";
-            }
-            catch (ElementNotAvailableException) { return requireRemoval ? "ORIGINAL_ELEMENT_REMOVED" : "BUTTON_UNAVAILABLE_OR_HIDDEN"; }
+            var result = ObservationStep.ReadOnce<AutomationElement.AutomationElementInformation, ElementNotAvailableException>(requireRemoval,
+                () => Id(candidate.Element) != candidate.Id,
+                () => candidate.Element.Current,
+                () => Snapshot(AutomationElement.FromHandle(hwnd)),
+                current => current.IsOffscreen,
+                current => !current.IsEnabled || current.IsOffscreen || current.Name != "允許一次");
+            if (result != null) return result;
             Thread.Sleep(250);
         }
         return "BUTTON_STILL_AVAILABLE; APPROVAL_OUTCOME_UNKNOWN";
@@ -504,10 +526,17 @@ internal static class ManualProgram
     static void AppendLog(string block)
     {
         if (log==null || block==null) return;
-        File.AppendAllText(log,block,new UTF8Encoding(false));
-        string summary=Path.ChangeExtension(log,null)+"-summary.txt", temp=summary+".tmp";
-        File.WriteAllText(temp,readableLog.Summary,new UTF8Encoding(true));
-        if(File.Exists(summary)) File.Replace(temp,summary,null); else File.Move(temp,summary);
+        try { LocalLogWriter.AppendWithSummaryFallback(log,block,readableLog.Summary,
+            e => readableLog.LocalLogFailure(lastScanMode,lastScanWindowState,e.Stage,e.NativeError),
+            e => Console.WriteLine("LOG_WRITE_WARNING: {0}:{1}",e.Stage,e.NativeError)); }
+        catch (LogWriteFailure e)
+        {
+            Console.WriteLine("LOG_WRITE_FAILURE: {0}:{1}",e.Stage,e.NativeError);
+            // A stale short summary cannot describe its own replacement failure.
+            // Best-effort fixed main-log evidence; never retry the failed block.
+            try { File.AppendAllText(log,readableLog.LocalLogFailure(lastScanMode,lastScanWindowState,e.Stage,e.NativeError),new UTF8Encoding(false)); } catch { }
+            throw;
+        }
     }
     static IntegrityResult Integrity(int pid)
     {

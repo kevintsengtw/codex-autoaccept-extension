@@ -1,4 +1,4 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><EnableDefaultCompileItems>false</EnableDefaultCompileItems></PropertyGroup>
-  <ItemGroup><Compile Include="AutoTests.cs" /><Compile Include="../manual/AutoGate.cs" /></ItemGroup>
+  <ItemGroup><Compile Include="AutoTests.cs" /><Compile Include="../manual/AutoGate.cs" /><Compile Include="../manual/ObservationStep.cs" /><Compile Include="../manual/BackgroundPolicy.cs" /><Compile Include="../manual/FocusPolicy.cs" /></ItemGroup>
 </Project>

@@ -31,15 +31,31 @@ VS Code 版與 Windows CLI 包裝器分別版本化，兩個開關互不連動�
 
 ## Windows 桌面 App：系統匣常駐工具
 
+最新本機候選為 [0.3.10 R11 背景不搶焦點版](artifacts/codex-autoaccept-desktop-windows-0.3.10-nofocus-r11-verified.zip)。核准後端改用同一個 `CUIAutomation8` 用戶端完成掃描、重驗與 Invoke，設定並讀回 `AutoSetFocus=false`；設定或讀回失敗即停止，保留原有安全檢查與單次核准限制。
+
+2026-10-14 已在本機 App `26.1007.2314.0` 完成 24 個真實背景／最小化案例：部分遮蔽、一般大小完全遮蔽、最大化完全遮蔽與最小化，各含既有／新請求各三案。全部在 20 秒內完成 marker，獨立 Windows 前景與焦點事件未記錄到 App 搶焦點，六個最小化案例全程保持最小化。前景與 OFF 回歸通過。本輪未重啟 App；公司 `26.803.81509` 與鎖定仍未驗證。詳見 [R11 結果與限制](desktop-probe/WINDOWS_TEST_RESULTS_20261014_R11.md)。
+
+以下 R4／R5 與舊 ZIP 為歷史結果，保留失敗證據，不代表 R11 的實測結果。
+
+另有 [0.3.10 候選測試版](artifacts/codex-autoaccept-desktop-windows-0.3.10.zip)：修正核准後觀察誤將根元素或 WindowPattern 讀取失效視為原核准按鈕已離開的問題。這類讀取錯誤現在保留結果未知與去重狀態，不重送核准；只有原候選本身讀取失效才可使用元素失效的週期判定。沿用 0.3.9 的本機 log 修正與紀錄節流，沒有新增診斷面板或放寬按鈕條件。三個建置、十一組測試及三項 API 檢查通過，另以真正 UIA 例外完成 21 項共用程式回歸檢查；這些檢查沒有操作 App，不能作為真實背景驗收。**0.3.10 的一般大小完全遮蔽、最大化完全遮蔽及最小化後新請求，各三案仍失敗；背景／最小化問題未修復。** 普通使用者工作階段矩陣與 OFF／重啟已完成稽核。相容冷啟動通過唯讀 preflight 並 armed 等待退出，但 GUI Quit 使控制會話中斷，沒有 launch stage／相容 profile 真實矩陣，列 BLOCKED；沒有猜測退出碼或新 App 啟動來源。
+
+2026-10-13 的 R4 已重新確認原生 Computer Use 可操作專用工具。先使用未修改的 0.3.9：前景只開 ON 一次，三筆不同真實請求均完成獨立 marker；App 完全遮蔽後才產生的新請求，三案在各自 20 秒觀察期內均未完成。主 log 的完整背景掃描沒有精確「允許一次」Button，還原前景後才完成；這是候選建立前的失敗，不能據此斷言 renderer 停止，也不能用 0.3.10 的觀察分類修正宣稱已解決。R4 矩陣與限制整理於 [本輪結果](desktop-probe/WINDOWS_TEST_RESULTS_20261013_R4.md)。本機 App 為 `26.1007.2314.0`，與公司 `26.803.81509` 不同，個人機結果不能替代公司驗收。
+
+0.3.10 的 R5 已確認前景一次 ON 三個真實 marker、部分遮蔽兩種順序各三案，以及一般大小／最大化完全遮蔽既有請求各三案完成；遮蔽完成案返回後均轉為前景，快速完成案保留計時限制。最小化既有請求三案完成，呼叫返回後仍最小化，UIA 觀察未知時保持去重且沒有重送。一般大小／最大化完全遮蔽及最小化後的新請求各三案，正式 20 秒均沒有精確 Button／核准嘗試或 marker，還原前景後才完成。初始 OFF、切 OFF 停止新嘗試與重啟仍 OFF 亦通過；重啟案是重啟前已存在的請求，不提升為重啟後新請求驗收。控制中斷與候選排除仍保留，詳見本輪結果。
+
+本輪相容嘗試的 App 關閉是代理執行的操作，使用者回報與代理承認均保留，沒有歸咎使用者。中斷後目前 App 保持開啟，不再關閉／重試；單次 ledger 保留。最後已確認工具 OFF、停止本輪前後端並恢復原設定，核對原設定位元組與雜湊相符。main log／摘要／journal／marker／producer 時序保留本機；歷史矩陣畫面來自本會話 Computer Use 工具輸出，未另存本機截圖檔，不宣稱已備份。原始 runtime 資料與影像不提交或加入 ZIP；成品封裝與 checksum 另行核對。
+
+[0.3.9 成品](artifacts/codex-autoaccept-desktop-windows-0.3.9.zip) 與 [R3 結果](desktop-probe/WINDOWS_TEST_RESULTS_20261013_R3.md) 保留；R3 當時的工具授權拒絕屬於該輪歷史狀態。[0.3.8 成品](artifacts/codex-autoaccept-desktop-windows-0.3.8.zip)、[更早結果](desktop-probe/WINDOWS_TEST_RESULTS_20261013.md) 與原始 0.3.7 ZIP 也均保留。
+
 [下載 Windows 系統匣版 0.3.7](artifacts/codex-autoaccept-desktop-windows-0.3.7.zip)。完整解壓後，雙擊 **`CodexAutoAcceptDesktop.exe`**，不需 Windows Terminal。第一次選取 ChatGPT App 視窗，再用滑鼠開啟 ON；關閉設定視窗仍會留在系統匣，右鍵圖示可切 ON／OFF 或退出。
 
 每次啟動都 OFF，由使用者手動開啟。可選擇登入 Windows 時啟動，只設定目前使用者的 Run 值；公司政策阻擋時會顯示錯誤。需要 Windows .NET Framework 4.8／4.8.1，以及公司允許前後端 EXE 執行，不要求管理員權限。
 
-公司 App `26.803.81509` 已確認 0.2.1 持續 ON／OFF，以及 0.3.2 一般使用者連接與基本核准。2026-10-13 的 0.3.7 公司回報：背景與最小化都有核准請求但不會自動處理，鎖定未測；先前將完全遮蔽視為已驗收的結論已撤回。0.3.7 移除畫面診斷區，改為正常 ON 時自動寫中文 log 與短摘要，可稍後手動轉抄「回報碼＋結果」，不需記住時間或送出檔案。公司 extension／CLI／Desktop 均只能使用「請求核准」，不能依賴 Approve for me／Full Access。此版沒有宣稱修好上述背景情境，也尚無命令規則或聊天 ID 綁定。
+公司 App `26.803.81509` 已確認 0.2.1 持續 ON／OFF，以及 0.3.2 一般使用者連接與基本核准。2026-10-13 的 0.3.7 公司回報：背景與最小化都有核准請求但不會自動處理，鎖定未測；先前將完全遮蔽視為已驗收的結論已撤回。0.3.7 移除畫面診斷區，改為正常 ON 時自動寫中文 log 與短摘要，可在本機稍後查看，不要求手動轉抄或外傳檔案。公司 extension／CLI／Desktop 均只能使用「請求核准」，不能依賴 Approve for me／Full Access。此版沒有宣稱修好上述背景情境，也尚無命令規則或聊天 ID 綁定。
 
 使用與更新見 [桌面版說明](desktop-probe/tray/README.md)，紀錄格式見 [log 說明](desktop-probe/LOG_FORMAT.md)，歷史與驗證見 [桌面工具驗證](desktop-probe/VERIFICATION.md)。成品仍附舊探測 CLI 原始碼與工具，日常操作不需要使用。
 
-另一台 Windows 11 可直接 clone／pull 此 repo，依 [Windows 驗證交接](desktop-probe/WINDOWS_HANDOFF.md) 取得 0.3.7 基準、驗證 checksum 並測真實核准；給 Windows Codex Desktop 的 [起始提示詞](desktop-probe/WINDOWS_CODEX_PROMPT.md) 及 [結果模板](desktop-probe/WINDOWS_TEST_RESULTS_TEMPLATE.md) 已整理。Computer Use 是否能操作原生 Windows 視窗，需由該會話的實際工具能力確認；此處沒有宣稱已在 Windows 完成驗證。
+另一台 Windows 11 可依 [Windows 驗證交接](desktop-probe/WINDOWS_HANDOFF.md) 取得 0.3.7 基準；[起始提示詞](desktop-probe/WINDOWS_CODEX_PROMPT.md) 及 [結果模板](desktop-probe/WINDOWS_TEST_RESULTS_TEMPLATE.md) 仍保留。2026-10-13 已在個人 Windows 使用實際原生 Computer Use 操作，結果與版本差異記於上方測試文件；不能替代公司版本驗收。
 
 ## Windows UIA Probe：控制台操作工具
 
