@@ -231,6 +231,8 @@ Codex 自己的參數必須放在 `--` 後：
 
 ### CLI 設定與排除問題
 
+**離開後未回到命令列（0.1.16 已知回報）：** 若 Codex 介面已關閉，卻沒有出現 PowerShell 的 `PS ...>`，可先在原分頁按一次 Ctrl+C；此處理方式尚待實測確認。若仍無反應，開新分頁繼續操作，再關閉卡住的舊分頁。此問題目前保留、尚未修正；詳見 [CLI 退出說明](cli/README.md#離開-codex-後沒有回到命令列)。Codex 仍在執行時，Ctrl+C 可能中斷目前工作。
+
 - `--config 'C:\tools\config.json'`：明確指定 JSON；不自動讀專案檔案。
 - 支援 `enabled`、`dryRun`、`approveFileChanges`、`allowPatterns`、`denyPatterns`；修改檔案後重啟。
 - `--codex 'C:\tools\codex.exe'`：指定執行檔；也可指定官方 npm `bin\codex.js`。
