@@ -7,7 +7,7 @@ import zipfile
 root = Path(__file__).resolve().parent.parent
 probe = root / "desktop-probe"
 parser = argparse.ArgumentParser(description=__doc__)
-parser.add_argument("--name", default="codex-autoaccept-desktop-windows-0.3.10")
+parser.add_argument("--name", default="codex-autoaccept-desktop-windows-0.3.10-nofocus-r12-node-recovery")
 name = parser.parse_args().name
 if not name.startswith("codex-autoaccept-desktop-windows-0.3.10") or any(c not in "abcdefghijklmnopqrstuvwxyz0123456789.-" for c in name):
     raise SystemExit("Invalid package name.")
@@ -19,6 +19,7 @@ files = {
     "source/shared/ScanMetrics.cs": probe / "shared/ScanMetrics.cs",
     "source/verify/ScanTests.csproj": probe / "verify/ScanTests.csproj",
     "source/verify/ScanTests.cs": probe / "verify/ScanTests.cs",
+    "source/verify/NodeRecoveryTests.cs": probe / "verify/NodeRecoveryTests.cs",
     "source/tray/BackgroundLaunch.cs": probe / "tray/BackgroundLaunch.cs",
     "source/verify/LaunchTests.csproj": probe / "verify/LaunchTests.csproj",
     "source/verify/LaunchTests.cs": probe / "verify/LaunchTests.cs",
@@ -31,6 +32,10 @@ files = {
     "examples/log-format-example.txt": probe / "examples/log-format-example.txt",
     "source/manual/BackgroundPolicy.cs": probe / "manual/BackgroundPolicy.cs",
     "source/manual/BackgroundProviderRefresh.cs": probe / "manual/BackgroundProviderRefresh.cs",
+    "source/manual/NodeScanBudget.cs": probe / "manual/NodeScanBudget.cs",
+    "source/manual/CompleteTreeScan.cs": probe / "manual/CompleteTreeScan.cs",
+    "source/manual/AutoScanCycle.cs": probe / "manual/AutoScanCycle.cs",
+    "source/manual/AccessibleRefreshScan.cs": probe / "manual/AccessibleRefreshScan.cs",
     "source/manual/FocusSafeAutomation.cs": probe / "manual/FocusSafeAutomation.cs",
     "source/manual/FocusPolicy.cs": probe / "manual/FocusPolicy.cs",
     "Interop.UIAutomationClient.dll": probe / "manual/bin/Release/net48/Interop.UIAutomationClient.dll",
@@ -77,6 +82,8 @@ files = {
     "WINDOWS_TEST_RESULTS_20261013_R3.md": probe / "WINDOWS_TEST_RESULTS_20261013_R3.md",
     "WINDOWS_TEST_RESULTS_20261013_R4.md": probe / "WINDOWS_TEST_RESULTS_20261013_R4.md",
     "WINDOWS_TEST_RESULTS_20261014_R11.md": probe / "WINDOWS_TEST_RESULTS_20261014_R11.md",
+    "WINDOWS_TEST_RESULTS_20261015_NODE_LIMIT.md": probe / "WINDOWS_TEST_RESULTS_20261015_NODE_LIMIT.md",
+    "WINDOWS_TEST_RESULTS_20261016_R12_PACKAGE.md": probe / "WINDOWS_TEST_RESULTS_20261016_R12_PACKAGE.md",
     "LICENSE": root / "LICENSE",
     "source/CodexUiaProbe.csproj": probe / "CodexUiaProbe.csproj",
     "source/Program.cs": probe / "Program.cs",
@@ -99,6 +106,8 @@ contents["SHA256SUMS"] = "".join(
     f"{hashlib.sha256(data).hexdigest()}  {key}\n" for key, data in sorted(contents.items())
 ).encode()
 out = root / "artifacts" / (name + ".zip")
+if out.exists():
+    raise SystemExit(f"Refusing to overwrite an existing archive: {out}")
 with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as archive:
     for key, data in contents.items():
         archive.writestr(name + "/" + key, data)

@@ -31,7 +31,13 @@ VS Code 版與 Windows CLI 包裝器分別版本化，兩個開關互不連動�
 
 ## Windows 桌面 App：系統匣常駐工具
 
-最新本機候選為 [0.3.10 R11 背景不搶焦點版](artifacts/codex-autoaccept-desktop-windows-0.3.10-nofocus-r11-verified.zip)。核准後端改用同一個 `CUIAutomation8` 用戶端完成掃描、重驗與 Invoke，設定並讀回 `AutoSetFocus=false`；設定或讀回失敗即停止，保留原有安全檢查與單次核准限制。
+最新本機成品為 [0.3.10 R12 掃描上限修正版](artifacts/codex-autoaccept-desktop-windows-0.3.10-nofocus-r12-node-recovery.zip)。預設系統匣自動掃描超限時，依序提高到 6000、10000，並從根元素重新完整掃描及重驗；不使用部分候選，保留 R11 的焦點與去重限制。請完整解壓到新資料夾並啟動 `CodexAutoAcceptDesktop.exe`，勿混用舊檔案；App 不需重啟。
+
+2026-10-16 已重新通過三個建置、十一組測試、三項 API 稽核及 ZIP 內容檢查；僅有既有 CS0649 測試警告。公司長時間與真實 App 效果未在本輪驗收，詳見 [R12 封裝結果](desktop-probe/WINDOWS_TEST_RESULTS_20261016_R12_PACKAGE.md)。原 R11 ZIP 保留，以下為其歷史驗證。
+
+截至 2026-10-18，R12 實際使用結果仍待使用者回報，收到後另行補記；目前程式回歸及封裝檢查不代表長時間工作已驗收。
+
+原 [0.3.10 R11 背景不搶焦點版](artifacts/codex-autoaccept-desktop-windows-0.3.10-nofocus-r11-verified.zip)。核准後端改用同一個 `CUIAutomation8` 用戶端完成掃描、重驗與 Invoke，設定並讀回 `AutoSetFocus=false`；設定或讀回失敗即停止，保留原有安全檢查與單次核准限制。
 
 2026-10-14 已在本機 App `26.1007.2314.0` 完成 24 個真實背景／最小化案例：部分遮蔽、一般大小完全遮蔽、最大化完全遮蔽與最小化，各含既有／新請求各三案。全部在 20 秒內完成 marker，獨立 Windows 前景與焦點事件未記錄到 App 搶焦點，六個最小化案例全程保持最小化。前景與 OFF 回歸通過。本輪未重啟 App；公司 `26.803.81509` 與鎖定仍未驗證。詳見 [R11 結果與限制](desktop-probe/WINDOWS_TEST_RESULTS_20261014_R11.md)。
 
