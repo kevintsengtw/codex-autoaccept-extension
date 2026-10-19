@@ -125,6 +125,70 @@ Check(recoveryLog.NodeRecovery(null,ScanStage.Scan,"BACKGROUND","MAXIMIZED")==nu
     "recovery accepts only fixed origin/stage/view tokens and the bounded monotonic ladder");
 Check(recoveryLog.Summary==recoverySummary && !recoveryLog.Summary.Contains("PRIVATE")
     && !recoveryLog.Summary.Contains(@"C:\"),"invalid recovery input cannot expose UI/provider content or alter exported summaries");
+
+static string SummarySection(string summary,string heading,string nextHeading)
+{
+    int start=summary.IndexOf(heading,StringComparison.Ordinal);
+    int end=summary.IndexOf(nextHeading,start+heading.Length,StringComparison.Ordinal);
+    Check(start>=0 && end>start,"summary section boundaries exist");
+    return summary.Substring(start,end-start);
+}
+DateTimeOffset wallTime=new DateTimeOffset(2026,10,19,23,59,58,TimeSpan.FromHours(8)).AddMilliseconds(125);
+long monotonicTime=0;
+int wallReads=0;
+var timedLog=new ReadableLog(()=>monotonicTime,()=>{wallReads++;return wallTime;});
+Check(timedLog.Summary.Contains("最近紀錄時間（本機）：尚無紀錄") && wallReads==0,
+    "an empty summary does not invent an event time or query the clock");
+var timedIssue=timedLog.Scan(new ScanMetrics { Mode="BACKGROUND",WindowState="NORMAL",Result="ERROR",Reason="ROOT_READ",Nodes=3 },false);
+const string issueTime="2026-10-19 23:59:58.125 +08:00";
+Check(timedIssue.Contains("本機時間："+issueTime) && timedLog.Summary.Contains("紀錄：L000001\r\n本機時間："+issueTime) && wallReads==1,
+    "main and issue summary share one captured local timestamp, offset and record number");
+wallTime=wallTime.AddSeconds(1);
+var timedAction=timedLog.Event("RETURNED",1,"BACKGROUND","NORMAL");
+const string actionTime="2026-10-19 23:59:59.125 +08:00";
+Check(timedAction.Contains("本機時間："+actionTime) && wallReads==2,"action gets its own event time");
+wallTime=wallTime.AddSeconds(2);
+var timedEmpty=new ScanMetrics { Mode="BACKGROUND",WindowState="NORMAL",Result="COMPLETE",Reason="NONE",Nodes=10,Buttons=2,Labels=0 };
+var timedScan=timedLog.Scan(timedEmpty,false);
+const string scanTime="2026-10-20 00:00:01.125 +08:00";
+string timedSummary=timedLog.Summary;
+Check(timedScan.Contains("本機時間："+scanTime) && timedSummary.Contains("最近紀錄時間（本機）："+scanTime) && wallReads==3,
+    "a new record updates the summary timestamp across midnight with the full date");
+string issueSection=SummarySection(timedSummary,"【最近一次受阻／錯誤", "【最近一次核准嘗試的結果】");
+string actionSection=SummarySection(timedSummary,"【最近一次核准嘗試的結果】", "各視窗狀態的最後掃描");
+string scanSection=SummarySection(timedSummary,"各視窗狀態的最後掃描", "---- 說明 ----");
+Check(issueSection.Contains("紀錄：L000001") && issueSection.Contains(issueTime) && !issueSection.Contains(scanTime),
+    "a later successful scan does not retimestamp the historical issue");
+Check(actionSection.Contains("紀錄：L000002") && actionSection.Contains(actionTime) && !actionSection.Contains(scanTime),
+    "the latest action retains its own time after later scans");
+Check(scanSection.Contains("紀錄：L000003") && scanSection.Contains(scanTime) && !scanSection.Contains(issueTime),
+    "the saved scan summary identifies the actual scan record and time");
+wallTime=wallTime.AddHours(4);
+Check(timedLog.Summary==timedSummary && timedLog.Summary==timedSummary && wallReads==3,
+    "opening or rereading a summary cannot make old records appear fresh");
+monotonicTime=9999;
+Check(timedLog.Scan(timedEmpty,false)==null && timedLog.Summary==timedSummary && wallReads==3,
+    "coalesced scans do not refresh timestamps or read the wall clock");
+wallTime=new DateTimeOffset(2026,10,19,8,0,0,TimeSpan.FromHours(8));
+monotonicTime=10000;
+var rollbackScan=timedLog.Scan(timedEmpty,false);
+Check(rollbackScan!=null && rollbackScan.Contains("2026-10-19 08:00:00.000 +08:00") && wallReads==4,
+    "wall-clock rollback does not change the existing monotonic ten-second retention interval");
+Check(SummarySection(timedLog.Summary,"【最近一次受阻／錯誤", "【最近一次核准嘗試的結果】").Contains(issueTime),
+    "clock adjustment leaves a frozen historical issue unchanged");
+var savedCulture=System.Globalization.CultureInfo.CurrentCulture;
+try
+{
+    System.Globalization.CultureInfo.CurrentCulture=System.Globalization.CultureInfo.GetCultureInfo("th-TH");
+    var cultureTime=new DateTimeOffset(2026,10,20,7,8,9,TimeSpan.FromMinutes(-210)).AddMilliseconds(10);
+    var cultureLog=new ReadableLog(localNow:()=>cultureTime);
+    Check(cultureLog.Status("STATUS: ON").Contains("2026-10-20 07:08:09.010 -03:30")
+        && cultureLog.Summary.Contains("2026-10-20 07:08:09.010 -03:30"),
+        "timestamps use a fixed Gregorian date format and preserve the actual local UTC offset");
+}
+finally { System.Globalization.CultureInfo.CurrentCulture=savedCulture; }
+Console.WriteLine("PASS: summary record timestamps, frozen historical issues/actions, scan correlation, midnight, read stability, monotonic throttling and culture/offset formatting.");
+
 if (OperatingSystem.IsWindows())
 {
     string writerRoot=Path.GetFullPath(Path.Combine(Path.GetTempPath(),"codex-log-tests-"+Guid.NewGuid().ToString("N")));
@@ -237,8 +301,12 @@ if (OperatingSystem.IsWindows())
 }
 if(args.Length==1)
 {
-    var sample=new ReadableLog();
-    m.Nodes=20; sample.Scan(m,false); sample.Event("RECHECK",first,"BACKGROUND","MAXIMIZED");
+    var sampleTime=new DateTimeOffset(2026,10,19,9,30,0,TimeSpan.FromHours(8));
+    var sample=new ReadableLog(localNow:()=>sampleTime);
+    m.Nodes=20; sample.Scan(m,false);
+    sampleTime=sampleTime.AddMinutes(2); sample.Event("RECHECK",first,"BACKGROUND","MAXIMIZED");
+    sampleTime=sampleTime.AddMinutes(1); sample.Event("ATTEMPT",first,"BACKGROUND","MAXIMIZED");
+    sampleTime=sampleTime.AddSeconds(1); sample.Event("RETURNED",first,"BACKGROUND","MAXIMIZED");
     Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(args[0]))!);
     File.WriteAllText(args[0],"示例資料，非公司測試結果。\r\n\r\n"+sample.Summary,new System.Text.UTF8Encoding(true));
 }

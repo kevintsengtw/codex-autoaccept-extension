@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.Text;
 
 // Keys stay in memory. The exported number is only a local UIA-candidate sequence,
@@ -32,11 +33,16 @@ internal sealed class ReadableLog
     readonly Dictionary<string,long> nodeRecoveryWrittenAt = new Dictionary<string,long>();
     readonly Stopwatch uptime = Stopwatch.StartNew();
     readonly Func<long> elapsedMilliseconds;
+    readonly Func<DateTimeOffset> localNow;
     const long REPEAT_INTERVAL_MS = 10000;
-    public ReadableLog(Func<long> elapsedMilliseconds = null)
-    { this.elapsedMilliseconds = elapsedMilliseconds ?? (() => uptime.ElapsedMilliseconds); }
+    public ReadableLog(Func<long> elapsedMilliseconds = null, Func<DateTimeOffset> localNow = null)
+    {
+        this.elapsedMilliseconds = elapsedMilliseconds ?? (() => uptime.ElapsedMilliseconds);
+        this.localNow = localNow ?? (() => DateTimeOffset.Now);
+    }
     string issueBrief, actionBrief;
     string lastScanText, lastScanCode;
+    string lastRecordTime;
     readonly Dictionary<string,string> viewBriefs = new Dictionary<string,string>();
     int sequence;
     public const string Version = "0.3.10";
@@ -83,13 +89,17 @@ internal sealed class ReadableLog
     }
     string Block(string mode,string size,long request,string phase,string result,string code,string detail,bool issue,bool action)
     {
+        // Capture once per retained record. Summary reads never refresh event time.
+        string timestamp=localNow().ToString("yyyy-MM-dd HH:mm:ss.fff zzz",CultureInfo.InvariantCulture);
+        lastRecordTime=timestamp;
         string number = request>0 && request<=1000000000 ? "P"+request.ToString("D6") : "未建立可追蹤候選";
         string block = "【紀錄 L"+(++sequence).ToString("D6")+"｜候選："+number+"】\r\n"
-            + "本機時間："+DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")+"\r\n"
+            + "本機時間："+timestamp+"\r\n"
             + "視窗狀態（本次或最後一次重掃）："+ViewText(mode,size)+"\r\n"
             + "階段："+phase+"\r\n結果："+result+"\r\n"
             + "回報碼：0310-"+View(mode,size)+"-"+code+"\r\n"+detail+"\r\n\r\n";
-        string brief="候選："+number+"；視窗："+ViewText(mode,size)+"\r\n回報碼：0310-"+View(mode,size)+"-"+code+"\r\n結果："+result+"\r\n\r\n";
+        string brief="紀錄：L"+sequence.ToString("D6")+"\r\n本機時間："+timestamp+"\r\n"
+            +"候選："+number+"；視窗："+ViewText(mode,size)+"\r\n回報碼：0310-"+View(mode,size)+"-"+code+"\r\n結果："+result+"\r\n\r\n";
         if(issue) issueBrief=brief;
         if(action) actionBrief=brief;
         return block;
@@ -125,7 +135,8 @@ internal sealed class ReadableLog
             + "\r\n本筆是否呼叫核准：否（掃描紀錄）"+(readOnly?"；唯讀模式不會核准":"；真正的核准嘗試另記於同一候選編號")
             + (m.Request==0?"\r\n請求關聯：資料不足，不能判定是哪次工作或是否已有待核准請求":"");
         string block=Block(m.Mode,m.WindowState,m.Request,readOnly?"唯讀掃描（不核准）":"自動模式：按鈕掃描",text,code,detail,issue,false);
-        viewBriefs[view]="視窗："+ViewText(m.Mode,m.WindowState)+"；候選："+(m.Request>0?"P"+m.Request.ToString("D6"):"未建立")
+        viewBriefs[view]="紀錄：L"+sequence.ToString("D6")+"\r\n本機時間："+lastRecordTime+"\r\n"
+            +"視窗："+ViewText(m.Mode,m.WindowState)+"；候選："+(m.Request>0?"P"+m.Request.ToString("D6"):"未建立")
             +"\r\n回報碼：0310-"+view+"-"+code+"\r\n結果："+text+"\r\n\r\n";
         return block;
     }
@@ -257,6 +268,8 @@ internal sealed class ReadableLog
         get
         {
             var s=new StringBuilder("Codex Auto-Accept "+Version+"｜回報用短摘要\r\n");
+            s.Append("最近紀錄時間（本機）：").Append(lastRecordTime??"尚無紀錄").Append("\r\n");
+            s.Append("各筆日期時間為工具記錄當時的本機時間；開啟摘要不會更新舊紀錄的時間。\r\n");
             s.Append("完整紀錄保留在本機；短摘要可能過期，核准結果須另以工作完成確認。\r\n");
             s.Append("這是保存的紀錄，不必停住工作；完整前後階段在同名主 log。\r\n\r\n");
             s.Append("【最近一次受阻／錯誤：歷史紀錄，不代表目前仍失敗】\r\n").Append(issueBrief??"尚無此類紀錄。\r\n\r\n");
