@@ -189,6 +189,57 @@ try
 finally { System.Globalization.CultureInfo.CurrentCulture=savedCulture; }
 Console.WriteLine("PASS: summary record timestamps, frozen historical issues/actions, scan correlation, midnight, read stability, monotonic throttling and culture/offset formatting.");
 
+var failureTime=new DateTimeOffset(2026,10,19,13,53,31,TimeSpan.FromHours(8)).AddMilliseconds(456);
+var retryRecords=new List<LogWriteDiagnostic>();
+var memoryMain=new MemoryStream();
+int opens=0;
+LocalLogWriter.AppendMain("unused","one record",retryRecords.Add,()=>failureTime,path=>
+{
+    opens++;
+    if(opens<=2) throw new IOException("PRIVATE_OPEN_MESSAGE",unchecked((int)(opens==1 ? 0x80070020u : 0x80070021u)));
+    return memoryMain;
+});
+Check(opens==3 && System.Text.Encoding.UTF8.GetString(memoryMain.ToArray())=="one record"
+    && retryRecords.Count==2 && retryRecords[0].Kind=="RETRY" && retryRecords[0].NativeError==32
+    && retryRecords[1].Kind=="RECOVERED" && retryRecords[1].NativeError==33 && retryRecords[1].Attempts==3
+    && retryRecords.All(record=>record.Time==failureTime),
+    "only unopened sharing/lock conflicts are retried with fixed times, bounded metadata and one committed record");
+int partialOpens=0;
+var partialStream=new PartialWriteStream();
+try
+{
+    LocalLogWriter.AppendMain("unused","never replay",localNow:()=>failureTime,open:path=>{partialOpens++;return partialStream;});
+    throw new Exception("Expected partial-write failure");
+}
+catch(LogWriteFailure partialFailure)
+{
+    Check(partialFailure.Stage=="MAIN_APPEND" && partialFailure.NativeError==32 && partialFailure.Time==failureTime && partialFailure.Attempts==1
+        && partialOpens==1 && partialStream.Writes==1 && partialStream.ToArray().Length>0,
+        "even Win32 32 after writing starts is never reopened/replayed and retains the actual failure timestamp");
+}
+Check(new ReadableLog().LocalLogFailure("BACKGROUND","NORMAL","MAIN_OPEN",32).Contains("0310-BN-L01"),
+    "main-open failure uses L01 rather than a summary replacement code");
+int fatalOpens=0;
+try
+{
+    LocalLogWriter.AppendMain("unused","no record",localNow:()=>failureTime,open:path=>
+    {fatalOpens++;throw new IOException("PRIVATE_DISK_FULL_MESSAGE",unchecked((int)0x80070070u));});
+    throw new Exception("Expected disk-full open failure");
+}
+catch(LogWriteFailure fatalOpen)
+{ Check(fatalOpen.NativeError==112 && fatalOpen.Attempts==1 && fatalOpens==1,"non-sharing open errors are not retried"); }
+var flushStream=new FailingFlushStream();
+int flushOpens=0;
+try
+{
+    LocalLogWriter.AppendMain("unused","already written",localNow:()=>failureTime,open:path=>{flushOpens++;return flushStream;});
+    throw new Exception("Expected flush failure");
+}
+catch(LogWriteFailure flushFailure)
+{ Check(flushFailure.Stage=="MAIN_APPEND" && flushFailure.NativeError==112 && flushOpens==1
+    && System.Text.Encoding.UTF8.GetString(flushStream.ToArray())=="already written","flush failure cannot reopen or replay persisted bytes"); }
+Console.WriteLine("PASS: deterministic main-open retry and partial-write no-replay tests.");
+
 if (OperatingSystem.IsWindows())
 {
     string writerRoot=Path.GetFullPath(Path.Combine(Path.GetTempPath(),"codex-log-tests-"+Guid.NewGuid().ToString("N")));
@@ -221,9 +272,18 @@ if (OperatingSystem.IsWindows())
         using(var locked=new FileStream(main,FileMode.Open,FileAccess.Read,FileShare.Read))
         {
             try { LocalLogWriter.Append(main,"must not appear\n","never"); throw new Exception("Expected main append denial"); }
-            catch(LogWriteFailure e) { Check(e.Stage=="MAIN_APPEND","main append denial is not a summary failure"); }
+            catch(LogWriteFailure e) { Check(e.Stage=="MAIN_OPEN" && e.Attempts==5,"persistent main open denial is bounded before any write"); }
         }
         Check(!File.ReadAllText(main).Contains("must not appear"),"main append is never retried after failure");
+        var mainEvents=new List<LogWriteDiagnostic>();
+        var mainReader=new FileStream(main,FileMode.Open,FileAccess.Read,FileShare.Read);
+        var releaseMain=Task.Run(()=>{Thread.Sleep(150);mainReader.Dispose();});
+        try { LocalLogWriter.Append(main,"after brief main conflict\n","main recovered",mainEvents.Add); }
+        finally { releaseMain.GetAwaiter().GetResult(); mainReader.Dispose(); }
+        Check(mainEvents.Count==2 && mainEvents[0].Kind=="RETRY" && mainEvents[0].NativeError==32
+            && mainEvents[1].Kind=="RECOVERED" && mainEvents[1].Attempts>=2 && mainEvents[1].Attempts<=5
+            && File.ReadAllText(main).Split("after brief main conflict\n").Length==2 && File.ReadAllText(summary)=="main recovered",
+            "real Windows main-open conflict recovers before writing, records first failure/recovery and keeps exactly one append");
         Console.WriteLine("PASS: Windows real-file sharing tests (temporary recovery, bounded persistent failure, atomic old summary, no duplicated main append).");
 
         string deniedMain=Path.Combine(writerRoot,"readonly-main.txt");
@@ -239,8 +299,8 @@ if (OperatingSystem.IsWindows())
             }
             catch(LogWriteFailure e)
             {
-                Check(e.Stage=="MAIN_APPEND" && e.NativeError==5 && e.InnerException is UnauthorizedAccessException,
-                    "read-only main is classified as a non-retried MAIN_APPEND access denial");
+                Check(e.Stage=="MAIN_OPEN" && e.NativeError==5 && e.Attempts==1 && e.InnerException is UnauthorizedAccessException,
+                    "read-only main is classified as a non-retried MAIN_OPEN access denial");
             }
         });
         Check(!mainWarning && File.ReadAllText(deniedMain)=="initial\n","read-only main failure cannot become a summary fallback or duplicate main contents");
@@ -269,6 +329,27 @@ if (OperatingSystem.IsWindows())
         Check(File.ReadAllText(tempSummary)=="recovered temp summary" && File.ReadAllText(tempMain)=="initial\nsecond\ntemp warning\nafter restore\n",
             "summary temp recovery updates only the next record without replaying the failed summary's main append");
 
+        string doubleMain=Path.Combine(writerRoot,"double-failure.txt"), doubleTemp=Path.Combine(writerRoot,"double-failure-summary.txt.tmp");
+        LocalLogWriter.Append(doubleMain,"initial\n","old"); File.WriteAllText(doubleTemp,"blocked");
+        var doubleEvents=new List<LogWriteDiagnostic>();
+        WhileReadOnly(doubleTemp,()=>
+        {
+            var original=File.GetAttributes(doubleMain);
+            try
+            {
+                LocalLogWriter.AppendWithSummaryFallback(doubleMain,"one complete record\n","new",
+                    failedSummary=>{File.SetAttributes(doubleMain,original|FileAttributes.ReadOnly);return "warning\n";},
+                    failedSummary=>{throw new Exception("A failed main-warning append cannot report continuation");},doubleEvents.Add);
+                throw new Exception("Expected warning append failure");
+            }
+            catch(LogWriteFailure warningFailure) { doubleEvents.Add(warningFailure.Diagnostic("FAILURE")); }
+            finally { File.SetAttributes(doubleMain,original); }
+        });
+        Check(doubleEvents.Count==2 && doubleEvents[0].Kind=="WARNING" && doubleEvents[0].Stage=="SUMMARY_WRITE"
+            && doubleEvents[0].NativeError==5 && doubleEvents[1].Kind=="FAILURE" && doubleEvents[1].Stage=="MAIN_OPEN"
+            && doubleEvents[1].NativeError==5 && File.ReadAllText(doubleMain)=="initial\none complete record\n",
+            "summary cause is retained independently before its main-log warning also fails; the complete record stays unique");
+
         string destinationMain=Path.Combine(writerRoot,"readonly-destination.txt");
         string destinationSummary=Path.Combine(writerRoot,"readonly-destination-summary.txt");
         LocalLogWriter.Append(destinationMain,"initial\n","old destination summary");
@@ -291,7 +372,7 @@ if (OperatingSystem.IsWindows())
         Check(File.ReadAllText(destinationSummary)=="recovered destination summary"
             && File.ReadAllText(destinationMain)=="initial\nsecond\ndestination warning\nafter restore\n",
             "summary destination recovers after restoring attributes without replaying the previous record");
-        Console.WriteLine("PASS: Windows real-file read-only tests (MAIN_APPEND:5, SUMMARY_WRITE:5, SUMMARY_REPLACE:"+destinationError+", attribute restoration, safe summary fallback, no replay).");
+        Console.WriteLine("PASS: Windows real-file read-only tests (MAIN_OPEN:5, SUMMARY_WRITE:5, SUMMARY_REPLACE:"+destinationError+", attribute restoration, safe summary fallback, no replay).");
     }
     finally
     {
@@ -311,3 +392,18 @@ if(args.Length==1)
     File.WriteAllText(args[0],"示例資料，非公司測試結果。\r\n\r\n"+sample.Summary,new System.Text.UTF8Encoding(true));
 }
 Console.WriteLine("PASS: readable log grouping, frozen issue summaries, status coalescing, no false success/request claims, code classification and privacy.");
+
+sealed class PartialWriteStream : MemoryStream
+{
+    public int Writes;
+    public override void Write(byte[] buffer,int offset,int count)
+    {
+        Writes++;
+        base.Write(buffer,offset,Math.Max(1,count/2));
+        throw new IOException("PRIVATE_PARTIAL_WRITE_MESSAGE",unchecked((int)0x80070020u));
+    }
+}
+sealed class FailingFlushStream : MemoryStream
+{
+    public override void Flush() { throw new IOException("PRIVATE_FLUSH_MESSAGE",unchecked((int)0x80070070u)); }
+}

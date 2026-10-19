@@ -205,8 +205,9 @@ internal sealed class ReadableLog
                 : reason=="BACKGROUND_RETAINED" ? "核准呼叫返回後，原生視窗仍在背景；工作完成仍須獨立證據"
                 : reason=="FOREGROUND_RETAINED" ? "核准呼叫返回後，原生視窗仍在前景；工作完成仍須獨立證據"
                 : "核准呼叫返回後，原生視窗狀態無法確認；不推論工作結果"; action=true; break;
-            case "LOG_WRITE_FAILURE": code=reason=="MAIN_APPEND"?"L01":reason=="SUMMARY_WRITE"?"L02":"L03";
-                text=reason=="MAIN_APPEND"?"完整主 log 寫入失敗，停止新的核准嘗試"
+            case "LOG_WRITE_FAILURE": code=reason=="MAIN_OPEN" || reason=="MAIN_APPEND"?"L01":reason=="SUMMARY_WRITE"?"L02":"L03";
+                text=reason=="MAIN_OPEN"?"完整主 log 開檔失敗，停止新的核准嘗試"
+                    :reason=="MAIN_APPEND"?"完整主 log 寫入失敗，停止新的核准嘗試"
                     :reason=="SUMMARY_WRITE"?"短摘要暫存檔寫入失敗；繼續使用完整主 log，摘要可能過期"
                     :"短摘要原子取代失敗；繼續使用完整主 log，摘要可能過期"; issue=true; break;
             case "REMOVED": code="A03"; text="原核准元素已失效，工具結束本次觀察並繼續監聽"; action=true; break;

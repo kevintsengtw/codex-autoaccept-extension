@@ -10,6 +10,18 @@ internal sealed class WorkerDiagnostics
     string logName;
     bool attempted;
     string logFailureStage;
+    int logFailureCode=-1;
+    LogWriteDiagnostic logFailureRecord;
+    readonly Func<LogWriteDiagnostic,string,bool> saveLogDiagnostic;
+    bool? diagnosticSaved;
+    public WorkerDiagnostics(Func<LogWriteDiagnostic,string,bool> saveLogDiagnostic=null)
+    { this.saveLogDiagnostic=saveLogDiagnostic; }
+    public string LogFailureDetails
+    {
+        get { lock(sync) return logFailureRecord!=null ? logFailureRecord.Description
+            : "失敗時間（本機）：未確認\r\n階段："+(logFailureStage??"未確認")+"；Windows 錯誤碼："
+                +(logFailureCode<0 ? "未確認" : logFailureCode.ToString(System.Globalization.CultureInfo.InvariantCulture))+"。"; }
+    }
     public bool Compatible { get { lock (sync) return version == ExpectedVersion; } }
     public string IntegritySummary
     {
@@ -22,8 +34,17 @@ internal sealed class WorkerDiagnostics
     {
         lock (sync)
         {
-            var logFailure = Regex.Match(line,@"^LOG_WRITE_FAILURE: (MAIN_APPEND|SUMMARY_WRITE|SUMMARY_REPLACE):(?:-1|\d{1,5})$");
-            if(logFailure.Success) { logFailureStage=logFailure.Groups[1].Value; errorType="LocalLogWriteFailure"; }
+            var record=LogWriteDiagnostic.Parse(line);
+            if(record!=null)
+            {
+                if(record.Kind=="FAILURE")
+                { logFailureRecord=record; logFailureStage=record.Stage; logFailureCode=record.NativeError; errorType="LocalLogWriteFailure"; }
+                if(saveLogDiagnostic!=null) diagnosticSaved=saveLogDiagnostic(record,logName);
+                return;
+            }
+            var logFailure = Regex.Match(line,@"\ALOG_WRITE_FAILURE: (MAIN_OPEN|MAIN_APPEND|SUMMARY_WRITE|SUMMARY_REPLACE):(-1|[0-9]{1,5})\z");
+            if(logFailure.Success && int.Parse(logFailure.Groups[2].Value,System.Globalization.CultureInfo.InvariantCulture)<=65535)
+            { logFailureStage=logFailure.Groups[1].Value; logFailureCode=int.Parse(logFailure.Groups[2].Value,System.Globalization.CultureInfo.InvariantCulture); errorType="LocalLogWriteFailure"; }
             var logMatch=Regex.Match(line,@"^LOG_NAME: (auto-\d{8}-\d{6}-[a-f0-9]{32}\.txt)$");
             if(logMatch.Success) logName=logMatch.Groups[1].Value;
             if (line.StartsWith("BACKEND_VERSION: "))
@@ -49,8 +70,9 @@ internal sealed class WorkerDiagnostics
     {
         lock (sync)
         {
-            string reason = logFailureStage != null ? "本機 log 寫入失敗，後端已停止。請查看完整主 log；短摘要可能過期。"
-                : version != ExpectedVersion ? "後端版本未確認或不符，請完整解壓同一版 ZIP。"
+            if(logFailureStage!=null)
+                return "後端退出碼 "+exitCode+"；"+DescribeLogFailure();
+            string reason = version != ExpectedVersion ? "後端版本未確認或不符，請完整解壓同一版 ZIP。"
                 : failure == "PROBE_ELEVATED" ? "後端已提升權限，請退出後以一般使用者重新啟動。"
                 : failure == "TARGET_ELEVATED" ? "App 是已提升權限的目標，此一般使用者工具不處理。"
                 : failure == "TARGET_OR_PERMISSION" ? "目標視窗已變更，或前後端與 App 權限不符。"
@@ -59,5 +81,13 @@ internal sealed class WorkerDiagnostics
             return "後端退出碼 " + exitCode + "；錯誤類型 " + (errorType ?? "未取得") + "。\n" + reason
                 + "\n" + IntegritySummary + (attempted ? " 核准可能已送出，請先查看 App，再重新連接。" : " 本次未記錄核准嘗試，可重新選擇視窗或重新連接。");
         }
+    }
+    public string DescribeLogFailure()
+    {
+        lock(sync) return "錯誤類型 LocalLogWriteFailure。\r\n"+LogFailureDetails
+            +"\r\n本機 log 寫入失敗，已停止新的核准嘗試；短摘要可能過期。"
+            +"\r\n"+(diagnosticSaved==true ? "本機診斷已另存，可按「開啟本次失敗診斷」。"
+                : "本機診斷未另存成功；請保留介面上的錯誤資訊。")
+            +"\r\n"+IntegritySummary+(attempted ? " 核准可能已送出，請先查看 App。" : " 本次未記錄核准嘗試。");
     }
 }

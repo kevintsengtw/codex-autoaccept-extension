@@ -546,9 +546,11 @@ internal static class ManualProgram
         if (log==null || block==null) return;
         try { LocalLogWriter.AppendWithSummaryFallback(log,block,readableLog.Summary,
             e => readableLog.LocalLogFailure(lastScanMode,lastScanWindowState,e.Stage,e.NativeError),
-            e => Console.WriteLine("LOG_WRITE_WARNING: {0}:{1}",e.Stage,e.NativeError)); }
+            e => Console.WriteLine("LOG_WRITE_WARNING: {0}:{1}",e.Stage,e.NativeError),
+            e => Console.WriteLine(e.Protocol)); }
         catch (LogWriteFailure e)
         {
+            Console.WriteLine(e.Diagnostic("FAILURE").Protocol);
             Console.WriteLine("LOG_WRITE_FAILURE: {0}:{1}",e.Stage,e.NativeError);
             // A stale short summary cannot describe its own replacement failure.
             // Best-effort fixed main-log evidence; never retry the failed block.

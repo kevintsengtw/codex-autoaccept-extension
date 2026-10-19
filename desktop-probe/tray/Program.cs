@@ -52,16 +52,17 @@ internal sealed class TrayContext : ApplicationContext
     Icon icon;
     bool busy, exiting, refreshStartup;
     string currentLogName;
+    LocalLogDiagnostics currentLocalDiagnostics;
     public TrayContext()
     {
         if (File.Exists(settingsFile))
             try { settings = new JavaScriptSerializer().Deserialize<Settings>(File.ReadAllText(settingsFile)) ?? new Settings(); } catch { }
-        panel.Text = "Codex Auto-Accept 0.3.10"; panel.ClientSize = new Size(620, 470);
+        panel.Text = "Codex Auto-Accept 0.3.10"; panel.ClientSize = new Size(620, 530);
         panel.FormBorderStyle = FormBorderStyle.FixedDialog; panel.MaximizeBox = false; panel.StartPosition = FormStartPosition.CenterScreen;
         panel.Font = new Font("Microsoft JhengHei UI", 10);
         status.SetBounds(20, 20, 500, 35); status.Font = new Font(panel.Font.FontFamily, 16, FontStyle.Bold);
         target.SetBounds(20, 65, 500, 50); target.AutoEllipsis = true;
-        detail.SetBounds(20, 120, 500, 80);
+        detail.SetBounds(20, 120, 580, 140);
         toggle.Text = "開啟 ON"; toggle.SetBounds(195, 205, 145, 40); toggle.Click += (s, e) => Toggle();
         choose.Text = "1. 選擇 App 視窗"; choose.SetBounds(20, 205, 165, 40); choose.Click += async (s, e) => await Choose();
         reconnect.Text = "重新連接"; reconnect.SetBounds(350, 205, 165, 40); reconnect.Click += async (s, e) => await Reconnect();
@@ -72,6 +73,7 @@ internal sealed class TrayContext : ApplicationContext
         var logTip = new Label { Text = "紀錄自動保留在本機，可稍後查看。\n完整 log 保留原因與核准前後階段。", Bounds = new Rectangle(260,365,340,50) };
         var tip = new Label { Text = "先選擇 App，再開啟 ON。關閉視窗仍常駐；右鍵系統匣可退出。", AutoSize = false };
         tip.SetBounds(20, 430, 580,30);
+        foreach(Control control in new Control[] { choose,toggle,reconnect,startup,launch,launchStatus,openLog,logTip,tip }) control.Top+=60;
         panel.Controls.AddRange(new Control[] { status, target, detail, choose, toggle, reconnect, startup, launch, launchStatus, openLog, logTip, tip });
         choose.TabIndex = 0; toggle.TabIndex = 1; reconnect.TabIndex = 2; startup.TabIndex = 3; launch.TabIndex = 4; openLog.TabIndex = 5;
         panel.FormClosing += (s, e) => { if (e.CloseReason == CloseReason.WindowsShutDown) return; if (!exiting) { e.Cancel = true; panel.Hide(); tray.ShowBalloonTip(2000, "Codex Auto-Accept", "程式仍在系統匣執行，雙擊圖示可開啟設定。", ToolTipIcon.Info); } };
@@ -101,6 +103,8 @@ internal sealed class TrayContext : ApplicationContext
         status.Text = state.Caption; toggle.Text = state.DesiredOn ? "2. 關閉 OFF" : "2. 開啟 ON"; toggleMenu.Text = state.DesiredOn ? "關閉 OFF" : "開啟 ON";
         toggle.Enabled = toggleMenu.Enabled = state.Ready && !state.Faulted && !busy;
         openLog.Enabled = !busy && currentLogName != null;
+        openLog.Text = state.Faulted ? (currentLocalDiagnostics!=null && File.Exists(currentLocalDiagnostics.FilePath)
+            ? "開啟本次失敗診斷" : "開啟本次完整 log") : "開啟本次 log 摘要";
         choose.Enabled = !busy; reconnect.Enabled = !busy && (selected != null || !string.IsNullOrEmpty(settings.TargetPath));
         launch.Enabled = !busy && !string.IsNullOrEmpty(settings.TargetPath);
         target.Text = selected == null ? "尚未連接 App。第一次請選擇視窗；之後會記住 App 路徑。" : "目標：" + selected.Name + " · PID " + selected.Pid + "\n" + selected.Title;
@@ -164,7 +168,8 @@ internal sealed class TrayContext : ApplicationContext
         {
             string path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"CodexUiaProbe",currentLogName);
             string summary=Path.ChangeExtension(path,null)+"-summary.txt";
-            if(File.Exists(summary)) path=summary;
+            if(state.Faulted && currentLocalDiagnostics!=null && File.Exists(currentLocalDiagnostics.FilePath)) path=currentLocalDiagnostics.FilePath;
+            else if(!state.Faulted && File.Exists(summary)) path=summary;
             if(!File.Exists(path)) { MessageBox.Show(panel,"本次 log 尚未建立。","執行紀錄"); return; }
             using(var process=Process.Start(new ProcessStartInfo(path){UseShellExecute=true})) { }
         }
@@ -251,7 +256,10 @@ internal sealed class TrayContext : ApplicationContext
             { UseShellExecute = false, CreateNoWindow = true, RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true,
               StandardOutputEncoding = Encoding.UTF8, StandardErrorEncoding = Encoding.UTF8 }, EnableRaisingEvents = true };
         worker = p; state.BeginConnection(); detail.Text = "正在連接…";
-        var diagnostics = new WorkerDiagnostics();
+        var localDiagnostics=new LocalLogDiagnostics(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "CodexAutoAcceptDesktop","diagnostics"));
+        currentLocalDiagnostics=localDiagnostics;
+        var diagnostics = new WorkerDiagnostics(localDiagnostics.Append);
         p.OutputDataReceived += (s, e) => {
             if (e.Data == null) return;
             diagnostics.Read(e.Data); // Retain safe diagnostics even if exit races ahead of UI delivery.
@@ -273,8 +281,14 @@ internal sealed class TrayContext : ApplicationContext
     }
     void Receive(string message, WorkerDiagnostics diagnostics)
     {
+        var logDiagnostic=LogWriteDiagnostic.Parse(message);
+        if(logDiagnostic!=null)
+        {
+            if(logDiagnostic.Kind=="FAILURE") { state.Disconnected(true); detail.Text=diagnostics.DescribeLogFailure(); Render(); }
+            return;
+        }
         if (message.StartsWith("LOG_WRITE_WARNING: ")) { detail.Text = "短摘要更新失敗；繼續使用完整主 log，原因已保留在本機。"; Render(); return; }
-        if (message.StartsWith("LOG_WRITE_FAILURE: ")) { state.Disconnected(true); detail.Text = "本機 log 寫入失敗，停止新的核准嘗試。請查看完整主 log；短摘要可能過期。"; Render(); return; }
+        if (message.StartsWith("LOG_WRITE_FAILURE: ")) { state.Disconnected(true); detail.Text = diagnostics.DescribeLogFailure(); Render(); return; }
         if (message.StartsWith("UIA_SCAN: ")) return;
         if (message.StartsWith("LOG_NAME: ")) { currentLogName=diagnostics.LogName; openLog.Enabled=!busy && currentLogName!=null; return; }
         if (message == "READY: OFF") {
