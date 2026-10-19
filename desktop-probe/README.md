@@ -2,7 +2,7 @@
 
 下載 `codex-uia-probe-windows` ZIP 後，請先看 **[獨立操作指南](../docs/CODEX_UIA_PROBE_WINDOWS.md)**：包含安裝、三種模式、O／F／Q 操作、報告位置、參數與疑難排解。下文保留進階與歷史驗證細節。
 
-目前桌面成品為 0.3.10 R12 掃描上限修正版，請先閱讀根目錄 README 及 `tray/README.md`，使用系統匣 `CodexAutoAcceptDesktop.exe`。預設自動掃描超限時依序提高到 6000、10000 並重新完整掃描與重驗；本輪程式回歸及封裝結果見 `WINDOWS_TEST_RESULTS_20261016_R12_PACKAGE.md`，公司長時間效果未驗收。R11 在 2026-10-14 的 24 個真實背景／最小化案例是歷史結果，詳見 `WINDOWS_TEST_RESULTS_20261014_R11.md`，不當成本輪實機測試。共享核准核心保留 `CUIAutomation8` 與 `AutoSetFocus=false`。下列保留舊診斷 CLI 說明，日常系統匣使用不需操作；正常 ON 時自動寫中文 log 與短摘要，參閱 `LOG_FORMAT.md`。
+目前桌面成品為 0.3.10 R13 摘要時間與 log 診斷修正版，請先閱讀根目錄 README 及 `tray/README.md`，使用系統匣 `CodexAutoAcceptDesktop.exe`。摘要加入日期時間，主 log 寫入前的共用衝突可有限重試，失敗時間、階段與 Windows 碼另存本機診斷；保留 R12 的節點上限恢復、完整重掃與重驗。本輪結果見 `WINDOWS_TEST_RESULTS_20261020_R13_PACKAGE.md`，公司長時間效果維持待驗證。R11 在 2026-10-14 的 24 個真實背景／最小化案例是歷史結果，詳見 `WINDOWS_TEST_RESULTS_20261014_R11.md`，不當成本輪實機測試。共享核准核心保留 `CUIAutomation8` 與 `AutoSetFocus=false`。下列保留舊診斷 CLI 說明，日常系統匣使用不需操作；正常 ON 時自動寫中文 log 與短摘要，參閱 `LOG_FORMAT.md`。
 
 公司 Windows 環境用的唯讀探測工具，目標是確認 ChatGPT Desktop App（Codex）`26.803.81509` 的核准介面是否提供可用的 Windows UI Automation 資訊。這個版本號由使用者提供，不代表工具已在該版本實測。
 

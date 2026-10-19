@@ -7,7 +7,7 @@ import zipfile
 root = Path(__file__).resolve().parent.parent
 probe = root / "desktop-probe"
 parser = argparse.ArgumentParser(description=__doc__)
-parser.add_argument("--name", default="codex-autoaccept-desktop-windows-0.3.10-nofocus-r12-node-recovery")
+parser.add_argument("--name", default="codex-autoaccept-desktop-windows-0.3.10-nofocus-r13-log-diagnostics")
 name = parser.parse_args().name
 if not name.startswith("codex-autoaccept-desktop-windows-0.3.10") or any(c not in "abcdefghijklmnopqrstuvwxyz0123456789.-" for c in name):
     raise SystemExit("Invalid package name.")
@@ -17,6 +17,7 @@ files = {
     "source/tray/CodexAutoAcceptDesktop.csproj": probe / "tray/CodexAutoAcceptDesktop.csproj",
     "source/tray/Program.cs": probe / "tray/Program.cs",
     "source/shared/ScanMetrics.cs": probe / "shared/ScanMetrics.cs",
+    "source/shared/LogWriteDiagnostic.cs": probe / "shared/LogWriteDiagnostic.cs",
     "source/verify/ScanTests.csproj": probe / "verify/ScanTests.csproj",
     "source/verify/ScanTests.cs": probe / "verify/ScanTests.cs",
     "source/verify/NodeRecoveryTests.cs": probe / "verify/NodeRecoveryTests.cs",
@@ -24,11 +25,13 @@ files = {
     "source/verify/LaunchTests.csproj": probe / "verify/LaunchTests.csproj",
     "source/verify/LaunchTests.cs": probe / "verify/LaunchTests.cs",
     "source/tray/WorkerDiagnostics.cs": probe / "tray/WorkerDiagnostics.cs",
+    "source/tray/LocalLogDiagnostics.cs": probe / "tray/LocalLogDiagnostics.cs",
     "source/manual/ReadableLog.cs": probe / "manual/ReadableLog.cs",
     "source/manual/LocalLogWriter.cs": probe / "manual/LocalLogWriter.cs",
     "source/manual/ObservationStep.cs": probe / "manual/ObservationStep.cs",
     "source/verify/LogTests.csproj": probe / "verify/LogTests.csproj",
     "source/verify/LogTests.cs": probe / "verify/LogTests.cs",
+    "source/verify/LogRuntimeVerification.cs": probe / "verify/LogRuntimeVerification.cs",
     "examples/log-format-example.txt": probe / "examples/log-format-example.txt",
     "source/manual/BackgroundPolicy.cs": probe / "manual/BackgroundPolicy.cs",
     "source/manual/BackgroundProviderRefresh.cs": probe / "manual/BackgroundProviderRefresh.cs",
@@ -84,6 +87,8 @@ files = {
     "WINDOWS_TEST_RESULTS_20261014_R11.md": probe / "WINDOWS_TEST_RESULTS_20261014_R11.md",
     "WINDOWS_TEST_RESULTS_20261015_NODE_LIMIT.md": probe / "WINDOWS_TEST_RESULTS_20261015_NODE_LIMIT.md",
     "WINDOWS_TEST_RESULTS_20261016_R12_PACKAGE.md": probe / "WINDOWS_TEST_RESULTS_20261016_R12_PACKAGE.md",
+    "WINDOWS_TEST_RESULTS_20261019_LOG_RECOVERY.md": probe / "WINDOWS_TEST_RESULTS_20261019_LOG_RECOVERY.md",
+    "WINDOWS_TEST_RESULTS_20261020_R13_PACKAGE.md": probe / "WINDOWS_TEST_RESULTS_20261020_R13_PACKAGE.md",
     "LICENSE": root / "LICENSE",
     "source/CodexUiaProbe.csproj": probe / "CodexUiaProbe.csproj",
     "source/Program.cs": probe / "Program.cs",

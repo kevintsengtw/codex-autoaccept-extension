@@ -31,11 +31,11 @@ VS Code 版與 Windows CLI 包裝器分別版本化，兩個開關互不連動�
 
 ## Windows 桌面 App：系統匣常駐工具
 
-最新本機成品為 [0.3.10 R12 掃描上限修正版](artifacts/codex-autoaccept-desktop-windows-0.3.10-nofocus-r12-node-recovery.zip)。預設系統匣自動掃描超限時，依序提高到 6000、10000，並從根元素重新完整掃描及重驗；不使用部分候選，保留 R11 的焦點與去重限制。請完整解壓到新資料夾並啟動 `CodexAutoAcceptDesktop.exe`，勿混用舊檔案；App 不需重啟。
+最新本機成品為 [0.3.10 R13 摘要時間與 log 診斷修正版](artifacts/codex-autoaccept-desktop-windows-0.3.10-nofocus-r13-log-diagnostics.zip)。摘要新增日期時間、毫秒、時區與紀錄序號；主 log 寫入前遇到 Windows 32／33 共用衝突時做有限重試，失敗時間、階段、Windows 碼另存本機診斷。已開始寫入後不重寫，也不重送核准。請完整解壓到新資料夾並啟動 `CodexAutoAcceptDesktop.exe`，勿混用舊檔案；App 不需重啟。
 
-2026-10-16 已重新通過三個建置、十一組測試、三項 API 稽核及 ZIP 內容檢查；僅有既有 CS0649 測試警告。公司長時間與真實 App 效果未在本輪驗收，詳見 [R12 封裝結果](desktop-probe/WINDOWS_TEST_RESULTS_20261016_R12_PACKAGE.md)。原 R11 ZIP 保留，以下為其歷史驗證。
+R13 保留 R12 的預設節點上限 3000→6000→10000 完整重掃與重驗，以及 R11 的焦點與去重限制。本輪重新驗證與封裝結果見 [R13 驗證文件](desktop-probe/WINDOWS_TEST_RESULTS_20261020_R13_PACKAGE.md)，公司環境長時間與真實核准實測維持待驗證。原 [R12 ZIP](artifacts/codex-autoaccept-desktop-windows-0.3.10-nofocus-r12-node-recovery.zip) 與 R11 ZIP 均保留；[R12 封裝結果](desktop-probe/WINDOWS_TEST_RESULTS_20261016_R12_PACKAGE.md) 為歷史紀錄。
 
-截至 2026-10-18，R12 實際使用結果仍待使用者回報，收到後另行補記；目前程式回歸及封裝檢查不代表長時間工作已驗收。
+2026-10-19 使用者回報 R12 因 `LocalLogWriteFailure` 停止，重新連接並開啟 ON 可恢復；當時沒有保留確切 Windows 錯誤碼。R13 修正本機可重現的短暫開檔衝突與診斷缺口，不能據此認定公司原始原因或宣稱長時間工作已驗收。
 
 原 [0.3.10 R11 背景不搶焦點版](artifacts/codex-autoaccept-desktop-windows-0.3.10-nofocus-r11-verified.zip)。核准後端改用同一個 `CUIAutomation8` 用戶端完成掃描、重驗與 Invoke，設定並讀回 `AutoSetFocus=false`；設定或讀回失敗即停止，保留原有安全檢查與單次核准限制。
 
