@@ -59,42 +59,65 @@ test('ANSI screen reconstruction handles split escapes and clears old prompts', 
   assert.equal(detect(screen(), opts), null);
   term.dispose();
 });
-function fixture() {
+function fixture(t, request = 'e', provider = 'n') {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'codex-autoaccept-test-'));
+  t.after(() => fs.rmSync(root, {recursive: true, force: true}));
   fs.mkdirSync(path.join(root,'out'));
   fs.writeFileSync(path.join(root,'package.json'), JSON.stringify({publisher:'openai', name:'chatgpt', main:'./out/extension.js'}));
-  const source = `class C{sendResponse(e,r){this.turnCwds.observeClientResponse({id:e,result:r})}handle(e){${patcher.ANCHOR}return{routeKind:'request',method:e.method}}}`;
+  const route = `if(this.isMcpRequestMessage(${request})){this.turnCwds.observeServerRequest(${request}),this.requestUserInputAutoResolutionCoordinator.observeServerRequest(${request});for(let[,${provider}]of this.providers)${provider}.onRequest?.(${request});return{routeKind:"request",method:${request}.method}}`;
+  const source = `class C{sendResponse(${request},r){this.turnCwds.observeClientResponse({id:${request},result:r})}handle(${request}){${route}}}`;
   fs.writeFileSync(path.join(root,'out/extension.js'), source);
   const runtime = path.join(root,'runtime.js'); fs.writeFileSync(runtime,'module.exports={decide:()=>null};');
-  return {root, source, runtime};
+  return {root, route, source, runtime};
 }
-test('patch installs, validates syntax, is idempotent, routes real decision and restores exact bytes', t => {
-  const {root, source, runtime} = fixture(); t.after(() => fs.rmSync(root,{recursive:true,force:true}));
-  assert.equal(patcher.install(root,runtime),'installed');
-  assert.equal(patcher.install(root,runtime),'already installed');
-  const patched = fs.readFileSync(path.join(root,'out/extension.js'),'utf8');
-  let shown = 0, response;
-  const C = vm.runInNewContext(patched+';C', {require: () => ({decide: () => ({decision:'accept'})})});
-  const connection = new C();
-  connection.turnCwds={observeClientResponse: r => response=r};
-  connection.requestUserInputAutoResolutionCoordinator={observeServerRequest:()=>{}};
-  connection.providers=new Map([['p',{onRequest:()=>shown++}]]);
-  connection.handle({id: 7,method:'item/commandExecution/requestApproval'});
-  assert.deepEqual(JSON.parse(JSON.stringify(response)),{id:7,result:{decision:'accept'}});
-  assert.equal(shown,0);
-  assert.equal(patcher.restore(root),'restored');
-  assert.equal(fs.readFileSync(path.join(root,'out/extension.js'),'utf8'),source);
-});
+for (const request of ['e', 't', '$req']) {
+  test(`patch routes one-time approvals with request variable ${request} and restores exact bytes`, t => {
+    const {root, source, runtime} = fixture(t, request);
+    assert.equal(patcher.install(root,runtime),'installed');
+    assert.equal(patcher.install(root,runtime),'already installed');
+    const patched = fs.readFileSync(path.join(root,'out/extension.js'),'utf8');
+    const responses = [], shown = [];
+    let enabled = true;
+    const C = vm.runInNewContext(patched+';C', {require: () => ({
+      decide: req => decision(req, {...opts, enabled})?.result
+    })});
+    const connection = new C();
+    connection.isMcpRequestMessage = req => req.id != null;
+    connection.turnCwds = {
+      observeServerRequest: () => {},
+      observeClientResponse: ({id, result}) => responses.push({id, result})
+    };
+    connection.requestUserInputAutoResolutionCoordinator = {observeServerRequest: () => {}};
+    connection.providers = new Map([['p', {onRequest: req => shown.push(req)}]]);
+    const command = {id: 7, method: 'item/commandExecution/requestApproval', params: {command: 'git status'}};
+    const permission = {id: 8, method: 'item/permissions/requestApproval', params: {}};
+    connection.handle(command);
+    connection.handle(permission);
+    enabled = false;
+    const manualCommand = {...command, id: 9};
+    connection.handle(manualCommand);
+    assert.deepEqual(responses, [{id: 7, result: {decision: 'accept'}}]);
+    assert.deepEqual(shown, [permission, manualCommand]);
+    assert.equal(patcher.restore(root),'restored');
+    assert.equal(fs.readFileSync(path.join(root,'out/extension.js'),'utf8'),source);
+  });
+}
 test('unknown layouts and tampered bundles are never overwritten', t => {
-  assert.throws(()=>patcher.patchedSource('unknown'),/Unsupported/);
-  const {root,runtime}=fixture(); t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+  const {root, route, source, runtime} = fixture(t, 't', 'p');
+  for (const unsupported of [
+    'unknown',
+    source.replace(route, route + route),
+    source.replace('p.onRequest?.(t)', 'p.onRequest?.(r)'),
+    source.replace('p.onRequest?.(t)', 'n.onRequest?.(t)'),
+    source.replace('observeClientResponse({id:t,result:r})', 'observeClientResponse({id:r,result:t})')
+  ]) assert.throws(() => patcher.patchedSource(unsupported), /Unsupported/);
   patcher.install(root,runtime);
   fs.appendFileSync(path.join(root,'out/extension.js'),'\n// other tool modified it');
   assert.throws(()=>patcher.restore(root),/refusing/);
   assert.throws(()=>patcher.install(root,runtime),/refusing/);
 });
 test('partial installation restores safely when original is still intact', t => {
-  const {root,source}=fixture();t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+  const {root,source}=fixture(t);
   fs.writeFileSync(path.join(root,'out/extension.js.codex-autoaccept-original'),source);
   assert.equal(patcher.restore(root),'restored');
 });

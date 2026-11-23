@@ -15,3 +15,6 @@ scripts/**
 artifacts/**
 
 desktop-probe/**
+console-probe/**
+.desktop-test/**
+graphify-out/**

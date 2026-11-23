@@ -18,3 +18,14 @@ Not performed: installing the VSIX into the user's normal VS Code profile, alter
 ## User-reported company Windows GUI verification — 2026-10-09
 
 The user confirmed VS Code GUI auto-accept works with Codex Auto-Accept 0.1.1 and official openai.chatgpt 26.1002.51308, including the Traditional Chinese “允許一次” prompt. The initial ON-but-no-approval result was resolved by executing Install / Repair Codex GUI Integration and reloading. This is user-reported live verification; it does not establish VS Code integrated-terminal CLI or Windows Terminal CLI results. Those remain pending. Earlier “Not performed” entries describe the original build-time scope.
+
+## VS Code GUI compatibility fix for 0.1.2 — 2026-11-23
+
+- The 0.1.1 patcher rejected the Codex 26.1117.31558 and 26.1117.41037 bundles when the minifier renamed the request variable. 0.1.2 matched the request route and passed syntax, installation, repeat installation, and byte-for-byte restoration checks on copies of macOS arm64 bundles 26.1111.21308, 26.1117.31558, and 26.1117.41037.
+- An isolated VS Code 1.147.0 Extension Host ran Install / Repair and loaded the patched Codex 26.1117.41037 extension on the next launch. With a simulated app-server, ON sent one `accept` for each of two command requests and one file-change request. The denied command, permission request, and command sent after toggling OFF received no automatic response.
+- All 21 unit and lifecycle tests passed, along with `npm run check` and VSIX packaging. The regular user profile and installed extension bundles were left untouched.
+- The repository VSIX includes the updated README. Its manifest and compiled JavaScript match the package used for the Extension Host test. The package checksum is listed in [SHA256SUMS](../artifacts/SHA256SUMS).
+
+### Company computer follow-up — 2026-11-23
+
+After installing Auto-Accept 0.1.2 on the company computer with VS Code 1.147.0 and Codex 26.1117.41037, the user reported seeing no confirmation dialogs during use so far. This is a preliminary observation from regular use. Individual approval requests and responses were outside the scope of the report.

@@ -3,9 +3,9 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const vm = require('node:vm');
 const MARKER = '/* codex-autoaccept:v1 */';
-// Verified against openai.chatgpt 26.1002.51308. Refuse unknown/minifier-changed layouts.
-const ANCHOR = 'this.requestUserInputAutoResolutionCoordinator.observeServerRequest(e);for(let[,n]of this.providers)n.onRequest?.(e);';
-const INJECT = `${MARKER}try{let __caa=require("./codex-autoaccept-runtime.cjs").decide(e);if(__caa){this.sendResponse(e.id,__caa);return{routeKind:"request",method:e.method}}}catch{};`;
+// Match the verified request branch even when the minifier renames its local variables.
+const REQUEST_ROUTE = /(?<before>if\(this\.isMcpRequestMessage\((?<request>[\w$]+)\)\)\{this\.turnCwds\.observeServerRequest\(\k<request>\),this\.requestUserInputAutoResolutionCoordinator\.observeServerRequest\(\k<request>\);)for\(let\[,(?<provider>[\w$]+)\]of this\.providers\)\k<provider>\.onRequest\?\.\(\k<request>\);return\{routeKind:"request",method:\k<request>\.method\}\}/g;
+const RESPONSE_SENDER = /\bsendResponse\(([\w$]+),([\w$]+)\)\{this\.turnCwds\.observeClientResponse\(\{id:\1,result:\2\}\)/;
 const hash = s => crypto.createHash('sha256').update(s).digest('hex');
 function paths(root) {
   const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
@@ -14,8 +14,13 @@ function paths(root) {
   return {file, backup: file + '.codex-autoaccept-original', meta: file + '.codex-autoaccept.json', helper: path.join(root, 'out/codex-autoaccept-runtime.cjs')};
 }
 function patchedSource(source) {
-  if (source.includes(MARKER) || source.split(ANCHOR).length !== 2 || !source.includes('sendResponse(e,r){this.turnCwds.observeClientResponse')) throw Error('Unsupported or already modified Codex bundle. No patch applied.');
-  const updated = source.replace(ANCHOR, ANCHOR.replace(';for', ';' + INJECT + 'for'));
+  const routes = Array.from(source.matchAll(REQUEST_ROUTE));
+  if (source.includes(MARKER) || routes.length !== 1 || !RESPONSE_SENDER.test(source)) throw Error('Unsupported or already modified Codex bundle. No patch applied.');
+  const route = routes[0];
+  const {before, request} = route.groups;
+  const index = route.index + before.length;
+  const inject = `${MARKER}try{let __caa=require("./codex-autoaccept-runtime.cjs").decide(${request});if(__caa){this.sendResponse(${request}.id,__caa);return{routeKind:"request",method:${request}.method}}}catch{};`;
+  const updated = source.slice(0, index) + inject + source.slice(index);
   new vm.Script(updated); // Parse before writing anything.
   return updated;
 }
@@ -59,4 +64,4 @@ function restore(root) {
   for (const f of [p.meta, p.backup, p.helper]) if (fs.existsSync(f)) fs.unlinkSync(f);
   return 'restored';
 }
-module.exports = {install, restore, patchedSource, ANCHOR, MARKER};
+module.exports = {install, restore, patchedSource, MARKER};

@@ -8,11 +8,11 @@
 
 ## 成品下載與驗證狀態
 
-[GitHub Releases](https://github.com/kevintsengtw/codex-autoaccept-extension/releases) 提供成品；repo 的 [`artifacts/`](artifacts/) 也保存以下檔案：
+目前版本可從下表的 [`artifacts/`](artifacts/) 下載。先前的發行檔另見 [GitHub Releases](https://github.com/kevintsengtw/codex-autoaccept-extension/releases)。
 
 | 成品 | 版本 | 用途 |
 | --- | --- | --- |
-| [codex-autoaccept-0.1.1.vsix](artifacts/codex-autoaccept-0.1.1.vsix) | 0.1.1 | VS Code 擴充套件 |
+| [codex-autoaccept-0.1.2.vsix](artifacts/codex-autoaccept-0.1.2.vsix) | 0.1.2 | VS Code 擴充套件 |
 | [codex-autoaccept-cli-windows-0.1.16.zip](artifacts/codex-autoaccept-cli-windows-0.1.16.zip) | 0.1.16 | Windows Terminal 獨立 CLI 測試版 |
 | [codex-uia-probe-windows-0.2.2.zip](artifacts/codex-uia-probe-windows-0.2.2.zip) | 0.2.2 | Windows 桌面 App：UIA 探測、手動單次與控制台 ON／OFF 工具；[操作指南](docs/CODEX_UIA_PROBE_WINDOWS.md) |
 | [SHA256SUMS](artifacts/SHA256SUMS) | — | 成品雜湊值 |
@@ -21,8 +21,8 @@ VS Code 版與 Windows CLI 包裝器分別版本化，兩個開關互不連動�
 
 | 情境 | 驗證狀態 |
 | --- | --- |
-| 公司 Windows：VS Code Codex 側邊欄 | 使用者已確認 0.1.1 可自動核准，官方 Codex 為 `26.1002.51308`；首次成功前需要安裝 GUI 整合 |
-| 繁體中文「允許一次」核准 | 使用者已確認上述 GUI 情境可使用；GUI 不依賴按鈕文字 |
+| 公司電腦：VS Code 1.147.0／Codex 26.1117.41037 | 使用者安裝 0.1.2 後，日常使用中尚未再看到「允許一次」確認視窗 |
+| macOS：VS Code 1.147.0／Codex 26.1117.41037 | 0.1.2 在隔離的 Extension Host 通過模擬命令及檔案單次核准測試 |
 | VS Code 整合終端機 Codex CLI | 自動化測試通過，實際公司環境端到端測試待驗證 |
 | Windows Terminal Codex CLI | 使用者確認 0.1.0 可自動核准但偶爾漏辨識；0.1.1 修正持續重繪與折行，Windows 實測待回報 |
 | Codex 桌面 App | 公司一般權限、App `26.803.81509`：唯讀探測與手動 Invoke 已成功；使用者已確認 0.2.1 只按一次 O 即連續三次自動核准、保持 ON，按 F 停止 |
@@ -87,11 +87,11 @@ R13 保留 R12 的預設節點上限 3000→6000→10000 完整重掃與重驗�
 - 已安裝並可正常使用官方 Codex 擴充套件，ID：`openai.chatgpt`。
 - 開啟信任的本機 workspace；Restricted Mode 不會自動核准。
 - 本套件與官方 Codex 必須位於相同 extension host。Remote SSH、WSL、Dev Containers 需特別確認安裝位置，尚未完成端到端驗證。
-- GUI 修補目前核對的官方版本是 `26.1002.51308`；未知程式結構會拒絕修補。
+- 0.1.2 已核對官方 Codex `26.1111.21308`、`26.1117.31558`、`26.1117.41037` 的 GUI 整合位置。未知程式結構會拒絕修補。
 
-### 首次安裝：每個 VS Code 設定檔都要確認整合
+### 安裝或升級 0.1.2
 
-1. 下載 `codex-autoaccept-0.1.1.vsix`。
+1. 下載 `codex-autoaccept-0.1.2.vsix`。
 2. 開啟 Extensions／擴充功能，按 `…` → **Install from VSIX…／從 VSIX 安裝…**，選取下載檔案。
 3. 如 VS Code 要求，重新載入視窗。
 4. 開啟專案；確認為信任的 workspace。
@@ -105,7 +105,7 @@ R13 保留 R12 的預設節點上限 3000→6000→10000 完整重掃與重驗�
 7. 點右下角 **Codex Auto-Accept: OFF**，切換為 **ON**。也可執行 `Codex Auto-Accept: Toggle`。
 8. 在 Codex 側邊欄觸發一個需要核准、且未被規則排除的操作。整合會直接回應單次核准，不需要按「允許一次」。
 
-**狀態列 ON 僅表示使用者設定已啟用，不代表 GUI 整合已安裝或載入。** 拿到另一台電腦安裝時，仍須完成第 5、6 步。0.1.1 曾出現「ON 但仍需按允許一次」的實測案例，原因就是漏做 GUI 整合。
+**ON 表示自動核准設定已啟用。** 首次在每個 VS Code 設定檔安裝時，請完成第 5、6 步以載入 GUI 整合。若從舊版升級是為了修復仍需按「允許一次」的問題，也請重新執行這兩步。
 
 ### 日常操作與更新
 
@@ -113,7 +113,7 @@ R13 保留 R12 的預設節點上限 3000→6000→10000 完整重掃與重驗�
 - `OFF`：保留人工核准。`ON`：依規則自動核准。`DRY RUN`：只記錄決策。`SETTINGS ERROR`：設定格式錯誤，自動核准暫停。
 - 狀態列括號中的數字是本次 extension host 執行期間的 **CLI** 自動送鍵次數；GUI 核准請看 GUI log。
 - 更新本套件後重新載入視窗；GUI runtime 的更新也需要重新載入才能生效。
-- 官方 Codex 更新後，曾安裝整合的設定檔會嘗試重新修補。請查看 log；必要時執行 Install / Repair 並重新載入。未來版本不保證相容。
+- 官方 Codex 更新後，曾安裝整合的設定檔會嘗試重新修補。ON 時若成功重新修補，VS Code 會提示重新載入。整合 log 會列出官方 Codex 版本及安裝結果。
 - 開關寫入失敗時會顯示原因並保留實際儲存狀態，快速連點會依序處理。
 
 ## VS Code 設定
@@ -257,12 +257,12 @@ VS Code 未提供本套件可用的跨擴充套件 Webview DOM 核准控制 API�
 
 支援 `item/commandExecution/requestApproval`、`item/fileChange/requestApproval`，以及舊版 `execCommandApproval`、`applyPatchApproval`。不自動回答使用者問題、MCP elicitation 或其他額外 permissions。即使 ON，未支援的請求與被規則排除的操作仍會出現人工核准。
 
-安裝會保留原檔備份、SHA-256 metadata，確認唯一程式特徵及 JS 語法後才寫入。更新或外部修改造成 hash 不一致時會拒絕覆寫。
+0.1.2 修正新版 Codex 變更內部變數名稱後，舊版無法定位核准請求分派程式碼的問題。安裝時會檢查請求分派和回覆的程式結構，確認唯一修補位置及 JavaScript 語法，並保留原檔備份與 SHA-256 雜湊。若遇到不支援的結構或檔案雜湊不符，會拒絕寫入。
 
 | 現象 | 檢查方式 |
 | --- | --- |
-| ON 但仍顯示「允許一次」 | 先執行 Install / Repair GUI Integration，再 Reload Window；ON 不表示整合就緒 |
-| `Unsupported ... bundle/layout` | 提供官方 Codex 版本及整合 log；需重新核對程式結構 |
+| ON 但仍顯示「允許一次」 | 確認已安裝 0.1.2，執行 Install / Repair GUI Integration，再 Reload Window。若仍出現，查看兩個 Codex Auto-Accept 輸出頻道 |
+| `Unsupported ... bundle/layout` | 在 Codex Auto-Accept 輸出頻道查看官方 Codex 版本及安裝錯誤 |
 | GUI 安裝權限錯誤 | 查看實際錯誤；本套件需要能寫入該官方擴充套件目錄 |
 | `SETTINGS ERROR` | 修正使用者設定中的型別、尺寸或 regex |
 | Log 顯示 MANUAL | 檢查 dry run、拒絕規則、白名單及檔案核准設定 |
@@ -310,7 +310,7 @@ CLI ZIP 打包腳本需要 Python 3，成品會包含 npm 提供的 Windows 原�
 | `docs/` | 驗證紀錄 |
 | `artifacts/` | 已打包 VSIX、Windows ZIP 及 checksum |
 
-0.1.1 修正開關寫入與刷新、快速連點、失敗回報，並保留錯誤設定下的使用者開關意圖；自動核准仍暫停至設定修正。Windows CLI 測試版為 0.1.16，修正 B001 把 `$rd` 等 PowerShell 變數當成刪除命令的誤判，真正的刪除命令仍保留人工確認。包含小可見區域展開修復與 B004 工具清單誤判修正，公司 Windows 最新案例實測待確認。log 預設每檔 5 MiB、3 份備份，總量約 20 MiB，舊大檔會保留近期完整紀錄後縮減。拒絕紀錄包含規則 ID／類別，回報時不需要命令全文；設定與分類表見 [CLI README](cli/README.md)。
+Windows CLI 測試版為 0.1.16，修正 B001 把 `$rd` 等 PowerShell 變數當成刪除命令的誤判，真正的刪除命令仍保留人工確認。包含小可見區域展開修復與 B004 工具清單誤判修正，公司 Windows 最新案例實測待確認。log 預設每檔 5 MiB、3 份備份，總量約 20 MiB，舊大檔會保留近期完整紀錄後縮減。拒絕紀錄包含規則 ID／類別，回報時不需要命令全文；設定與分類表見 [CLI README](cli/README.md)。
 
 ## 參考來源與授權
 

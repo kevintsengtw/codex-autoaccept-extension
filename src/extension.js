@@ -21,22 +21,30 @@ function activate(context) {
     status.tooltip = (s.configurationError ? `Invalid settings: ${s.configurationError}. Automatic approvals are paused. ` : '') + 'Click to toggle. GUI integration needs a one-time install and window reload. CLI requires shell integration and a newly started codex command.';
     status.command = 'codexAutoAccept.toggle'; status.show();
   };
-  const codexRoot = () => {
+  const codexExtension = () => {
     const ext = vscode.extensions.getExtension('openai.chatgpt');
     if (!ext) throw Error('Codex extension openai.chatgpt is not installed in this extension host.');
-    return ext.extensionPath;
+    return ext;
   };
   const runtime = path.join(context.extensionPath, 'dist/gui-runtime.js');
   async function installGui(interactive) {
+    let version;
     try {
-      const result = patcher.install(codexRoot(), runtime);
+      const ext = codexExtension();
+      version = ext.packageJSON.version;
+      const result = patcher.install(ext.extensionPath, runtime);
       await context.globalState.update('guiInstalled', true);
-      say(`GUI integration ${result}.`);
-      if (interactive) {
-        const answer = await vscode.window.showInformationMessage('Codex GUI integration installed. Reload this window to load it; the ON/OFF switch then works immediately.', 'Reload Window');
+      say(`GUI integration ${result} for Codex ${version}.`);
+      const s = settings();
+      if (interactive || (result === 'installed' && s.enabled && s.guiEnabled)) {
+        const answer = await vscode.window.showInformationMessage(`Codex GUI integration is ready for Codex ${version}. Reload this window to load it.`, 'Reload Window');
         if (answer) await vscode.commands.executeCommand('workbench.action.reloadWindow');
       }
-    } catch (err) { say(`GUI integration: ${err.message}`); if (interactive) vscode.window.showErrorMessage(err.message); }
+    } catch (err) {
+      const message = `GUI integration${version ? ` for Codex ${version}` : ''}: ${err.message}`;
+      say(message);
+      if (interactive) vscode.window.showErrorMessage(message);
+    }
   }
   function stop(execution) {
     const watch = watches.get(execution);
@@ -115,7 +123,7 @@ function activate(context) {
   register('installGui', () => installGui(true));
   register('restoreGui', async () => {
     try {
-      say(`GUI integration ${patcher.restore(codexRoot())}.`);
+      say(`GUI integration ${patcher.restore(codexExtension().extensionPath)}.`);
       await context.globalState.update('guiInstalled', false);
       const answer = await vscode.window.showInformationMessage('Original Codex extension restored. Reload to unload the integration.', 'Reload Window');
       if (answer) await vscode.commands.executeCommand('workbench.action.reloadWindow');
