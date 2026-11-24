@@ -11,25 +11,37 @@ function host(t, options = {}) {
   const event = name => fn => { listeners[name] = fn; return {dispose() {}}; };
   const cfg = {inspect: key => ({globalValue: values[key.replace(/^codexAutoAccept\./, '')]}), update: async (key, value) => {if (options.fail) throw Error('settings file is read-only');values[key.replace(/^codexAutoAccept\./, '')] = value;if (!options.noEvent) listeners.config({affectsConfiguration:()=>true});}};
   const status = {show(){},dispose(){}};
-  const errors = [];
+  const errors = [], notices = [];
   const vscode = {
     workspace: {isTrusted: true, getConfiguration: () => cfg, onDidChangeConfiguration:event('config')},
-    extensions: {onDidChange:event('extensions')},
+    extensions: {onDidChange:event('extensions'), getExtension: () => options.vendor},
     commands: {registerCommand:(name,fn)=>{commands[name]=fn;return {dispose(){}};}},
     ConfigurationTarget: {Global: 1}, StatusBarAlignment: {Right: 1},
     window: {
       createOutputChannel: () => ({appendLine(){},dispose(){}}),
       createStatusBarItem: () => status,
       showErrorMessage: async message => {errors.push(message);},
+      showInformationMessage: async message => {notices.push(message);},
       onDidStartTerminalShellExecution:event('start'), onDidEndTerminalShellExecution:event('end'),
       onDidCloseTerminal:event('close')
     }
   };
   const module = {exports:{}};
   vm.runInNewContext(fs.readFileSync(require.resolve('../src/extension.js'),'utf8'), {
-    module, require: name => name === 'vscode' ? vscode : localRequire(name), setTimeout, clearTimeout
+    module, require: name => {
+      if (name === 'vscode') return vscode;
+      if (name === './patcher' && options.patcher) return options.patcher;
+      return localRequire(name);
+    }, setTimeout, clearTimeout
   });
-  const context = {extensionPath: process.cwd(), globalState:{get:()=>false}, subscriptions:[]};
+  const context = {
+    extensionPath: process.cwd(),
+    globalState: {
+      get: () => options.guiInstalled,
+      update: async (key, value) => {options.guiInstalled = value;}
+    },
+    subscriptions: []
+  };
   module.exports.activate(context);
   let queue = [], waiting, closed = false;
   const execution = {commandLine:{value:'codex'}, read:()=>({
@@ -45,7 +57,7 @@ function host(t, options = {}) {
   t.after(()=>{finish();for(const disposable of context.subscriptions) disposable.dispose();});
   listeners.start({execution, terminal});
   const write = data => {if(waiting){const resolve=waiting;waiting=undefined;resolve({value:data,done:false});}else queue.push(data);};
-  return {write, finish, sent, values, listeners, terminal, commands, status, errors};
+  return {write, finish, sent, values, listeners, terminal, commands, status, errors, notices};
 }
 test('CLI sends a single y; repeated ANSI redraw does not resend', async t => {
   const h = host(t);
@@ -99,4 +111,63 @@ test('rapid clicks are serialized and each toggles the saved value', async t => 
   const h=host(t,{values:{enabled:false}});
   await Promise.all([h.commands['codexAutoAccept.toggle'](),h.commands['codexAutoAccept.toggle']()]);
   assert.equal(h.values.enabled,false);assert.match(h.status.text,/OFF/);
+});
+
+test('ON prepares a new Codex install before activation and repairs a later version once', t => {
+  const installed = [];
+  const options = {
+    vendor: {extensionPath: '/old-codex', packageJSON: {version: 'old'}, isActive: false},
+    patcher: {install: path => {installed.push(path); return 'installed';}, isLoaded: () => false}
+  };
+  const h = host(t, options);
+  assert.deepEqual(installed, ['/old-codex']);
+  assert.equal(h.notices.length, 0);
+  options.vendor = {extensionPath: '/updated-codex', packageJSON: {version: 'new'}, isActive: false};
+  options.patcher.isLoaded = () => true;
+  h.listeners.extensions();
+  h.listeners.extensions();
+  assert.deepEqual(installed, ['/old-codex', '/updated-codex']);
+  assert.match(h.status.text, /ON.*GUI RELOAD/);
+  assert.equal(h.notices.length, 1);
+});
+
+test('OFF leaves Codex untouched and explicitly restored GUI stays manual until reinstalled', async t => {
+  let installs = 0;
+  const options = {
+    values: {enabled: false},
+    vendor: {extensionPath: '/codex', packageJSON: {version: 'test'}},
+    patcher: {
+      install: () => {installs++; return 'installed';},
+      restore: () => 'restored',
+      isLoaded: () => false
+    }
+  };
+  const h = host(t, options);
+  assert.equal(installs, 0);
+  await h.commands['codexAutoAccept.toggle']();
+  assert.equal(installs, 1);
+  await h.commands['codexAutoAccept.restoreGui']();
+  options.vendor.extensionPath = '/updated-codex';
+  h.listeners.extensions();
+  assert.equal(installs, 1);
+  await h.commands['codexAutoAccept.installGui']();
+  assert.equal(installs, 2);
+  assert.equal(options.guiInstalled, true);
+});
+
+test('unsupported Codex integration is visible while ON and explicit repair can retry', async t => {
+  let attempts = 0;
+  const h = host(t, {
+    vendor: {extensionPath: '/codex', packageJSON: {version: 'test'}},
+    patcher: {install: () => {
+      attempts++;
+      if (attempts === 1) throw Error('Unsupported Codex bundle');
+      return 'already installed';
+    }}
+  });
+  assert.match(h.status.text, /ON.*GUI ERROR/);
+  assert.match(h.status.tooltip, /Codex test.*Unsupported Codex bundle/);
+  await h.commands['codexAutoAccept.installGui']();
+  assert.equal(attempts, 2);
+  assert.doesNotMatch(h.status.text, /GUI ERROR/);
 });

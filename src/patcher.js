@@ -34,8 +34,11 @@ function install(root, runtime) {
   if (source.includes(MARKER)) {
     const m = JSON.parse(fs.readFileSync(p.meta, 'utf8'));
     if (hash(source) !== m.patched || hash(fs.readFileSync(p.backup)) !== m.original) throw Error('Patched bundle or backup changed; refusing to overwrite.');
-    atomicWrite(p.helper, fs.readFileSync(runtime));
-    return 'already installed';
+    const helper = fs.readFileSync(runtime);
+    if (fs.existsSync(p.helper) && fs.readFileSync(p.helper).equals(helper)) return 'already installed';
+    new vm.Script(helper.toString());
+    atomicWrite(p.helper, helper);
+    return 'runtime updated';
   }
   if (fs.existsSync(p.backup) || fs.existsSync(p.meta)) throw Error('Existing backup metadata found. Restore/inspect before reinstalling.');
   const updated = patchedSource(source);
@@ -64,4 +67,8 @@ function restore(root) {
   for (const f of [p.meta, p.backup, p.helper]) if (fs.existsSync(f)) fs.unlinkSync(f);
   return 'restored';
 }
-module.exports = {install, restore, patchedSource, MARKER};
+// isActive can still be false while VS Code is activating an already-loaded entry point.
+function isLoaded(root) {
+  return Boolean(require.cache[fs.realpathSync(path.join(root, 'out/extension.js'))]);
+}
+module.exports = {install, restore, patchedSource, isLoaded, MARKER};

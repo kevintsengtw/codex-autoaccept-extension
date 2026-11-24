@@ -2,7 +2,7 @@
   "name": "codex-autoaccept",
   "displayName": "Codex Auto-Accept",
   "description": "Toggle automatic approval for Codex IDE requests and integrated-terminal CLI sessions.",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "publisher": "local-tools",
   "license": "MIT",
   "engines": {
@@ -13,7 +13,7 @@
   ],
   "main": "./dist/extension.js",
   "activationEvents": [
-    "onStartupFinished"
+    "*"
   ],
   "capabilities": {
     "untrustedWorkspaces": {
@@ -68,7 +68,7 @@
           "type": "boolean",
           "default": true,
           "scope": "machine",
-          "description": "Approve command/file requests after GUI integration is installed."
+          "description": "Prepare GUI integration and approve eligible command/file requests when Auto-Accept is ON."
         },
         "codexAutoAccept.approveFileChanges": {
           "type": "boolean",

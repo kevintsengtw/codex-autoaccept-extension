@@ -4,7 +4,7 @@
 
 適用於仍提供「允許一次」核准流程的環境。工具不修改 Codex 的 `config.toml`、sandbox、approval policy 或企業 managed requirements；政策直接禁止且沒有可核准提示的操作，不會因此變成可執行。
 
-> **VS Code 的 Codex 側邊欄需要額外安裝 GUI 整合。安裝 VSIX、重開 VS Code、切到 ON 都不等於完成 GUI 整合。請務必執行 `Codex Auto-Accept: Install / Repair Codex GUI Integration`，然後重新載入視窗。**
+> **從 0.1.3 起，Auto-Accept 在 ON 時會自動準備 Codex 側邊欄的 GUI 整合。** 若 Codex 已載入，狀態列會顯示 **GUI RELOAD**，按提示重新載入即可。
 
 ## 成品下載與驗證狀態
 
@@ -12,7 +12,7 @@
 
 | 成品 | 版本 | 用途 |
 | --- | --- | --- |
-| [codex-autoaccept-0.1.2.vsix](artifacts/codex-autoaccept-0.1.2.vsix) | 0.1.2 | VS Code 擴充套件 |
+| [codex-autoaccept-0.1.3.vsix](artifacts/codex-autoaccept-0.1.3.vsix) | 0.1.3 | VS Code 擴充套件 |
 | [codex-autoaccept-cli-windows-0.1.16.zip](artifacts/codex-autoaccept-cli-windows-0.1.16.zip) | 0.1.16 | Windows Terminal 獨立 CLI 測試版 |
 | [codex-uia-probe-windows-0.2.2.zip](artifacts/codex-uia-probe-windows-0.2.2.zip) | 0.2.2 | Windows 桌面 App：UIA 探測、手動單次與控制台 ON／OFF 工具；[操作指南](docs/CODEX_UIA_PROBE_WINDOWS.md) |
 | [SHA256SUMS](artifacts/SHA256SUMS) | — | 成品雜湊值 |
@@ -21,8 +21,8 @@ VS Code 版與 Windows CLI 包裝器分別版本化，兩個開關互不連動�
 
 | 情境 | 驗證狀態 |
 | --- | --- |
-| 公司電腦：VS Code 1.147.0／Codex 26.1117.41037 | 使用者安裝 0.1.2 後，日常使用中尚未再看到「允許一次」確認視窗 |
-| macOS：VS Code 1.147.0／Codex 26.1117.41037 | 0.1.2 在隔離的 Extension Host 通過模擬命令及檔案單次核准測試 |
+| 公司電腦：VS Code Codex 側邊欄 | 使用者確認 0.1.3 可正常自動核准 |
+| macOS：VS Code 1.147.0／Codex 26.51120.41243 | 0.1.3 在隔離的 Extension Host 通過升級後首次啟動的模擬單次核准測試 |
 | VS Code 整合終端機 Codex CLI | 自動化測試通過，實際公司環境端到端測試待驗證 |
 | Windows Terminal Codex CLI | 使用者確認 0.1.0 可自動核准但偶爾漏辨識；0.1.1 修正持續重繪與折行，Windows 實測待回報 |
 | Codex 桌面 App | 公司一般權限、App `26.803.81509`：唯讀探測與手動 Invoke 已成功；使用者已確認 0.2.1 只按一次 O 即連續三次自動核准、保持 ON，按 F 停止 |
@@ -87,33 +87,24 @@ R13 保留 R12 的預設節點上限 3000→6000→10000 完整重掃與重驗�
 - 已安裝並可正常使用官方 Codex 擴充套件，ID：`openai.chatgpt`。
 - 開啟信任的本機 workspace；Restricted Mode 不會自動核准。
 - 本套件與官方 Codex 必須位於相同 extension host。Remote SSH、WSL、Dev Containers 需特別確認安裝位置，尚未完成端到端驗證。
-- 0.1.2 已核對官方 Codex `26.1111.21308`、`26.1117.31558`、`26.1117.41037` 的 GUI 整合位置。未知程式結構會拒絕修補。
+- 已核對官方 Codex `26.1111.21308`、`26.1117.31558`、`26.1117.41037`、`26.51120.41243` 的 GUI 整合位置。未知程式結構會保留人工核准。
 
-### 安裝或升級 0.1.2
+### 安裝或升級 0.1.3
 
-1. 下載 `codex-autoaccept-0.1.2.vsix`。
-2. 開啟 Extensions／擴充功能，按 `…` → **Install from VSIX…／從 VSIX 安裝…**，選取下載檔案。
-3. 如 VS Code 要求，重新載入視窗。
-4. 開啟專案；確認為信任的 workspace。
-5. 按 **Ctrl+Shift+P**（macOS：**Cmd+Shift+P**），執行：
+1. 在 VS Code 的擴充功能面板按 `…` → **Install from VSIX…／從 VSIX 安裝…**，選取 `codex-autoaccept-0.1.3.vsix`。
+2. 重新載入 VS Code，並開啟信任的工作區。
+3. 確認右下角顯示 **Codex Auto-Accept: ON**。如為 OFF，點擊切到 ON。
+4. 如果顯示 **GUI RELOAD**，按通知上的 **Reload Window**，或執行 `Developer: Reload Window`。
 
-   ```text
-   Codex Auto-Accept: Install / Repair Codex GUI Integration
-   ```
-
-6. 整合安裝成功後，按 **Reload Window**，或執行 `Developer: Reload Window`。
-7. 點右下角 **Codex Auto-Accept: OFF**，切換為 **ON**。也可執行 `Codex Auto-Accept: Toggle`。
-8. 在 Codex 側邊欄觸發一個需要核准、且未被規則排除的操作。整合會直接回應單次核准，不需要按「允許一次」。
-
-**ON 表示自動核准設定已啟用。** 首次在每個 VS Code 設定檔安裝時，請完成第 5、6 步以載入 GUI 整合。若從舊版升級是為了修復仍需按「允許一次」的問題，也請重新執行這兩步。
+曾執行 **Restore Original Codex Extension** 的設定檔，須執行一次 **Install / Repair Codex GUI Integration** 才會恢復 GUI 整合。若只用整合終端機，可設 `codexAutoAccept.guiEnabled: false`。
 
 ### 日常操作與更新
 
 - 點右下角開關切換 ON／OFF；設定儲存後立即刷新。
 - `OFF`：保留人工核准。`ON`：依規則自動核准。`DRY RUN`：只記錄決策。`SETTINGS ERROR`：設定格式錯誤，自動核准暫停。
 - 狀態列括號中的數字是本次 extension host 執行期間的 **CLI** 自動送鍵次數；GUI 核准請看 GUI log。
-- 更新本套件後重新載入視窗；GUI runtime 的更新也需要重新載入才能生效。
-- 官方 Codex 更新後，曾安裝整合的設定檔會嘗試重新修補。ON 時若成功重新修補，VS Code 會提示重新載入。整合 log 會列出官方 Codex 版本及安裝結果。
+- 更新本套件後重新載入視窗。0.1.3 啟動時會在官方 Codex 載入前準備 GUI 整合，官方 Codex 更新後也會重新套用。
+- **GUI RELOAD** 表示 Codex 已載入，須重新載入視窗才會使用新整合。**GUI ERROR** 表示整合失敗。輸出頻道 **Codex Auto-Accept** 會列出官方 Codex 版本及安裝結果。
 - 開關寫入失敗時會顯示原因並保留實際儲存狀態，快速連點會依序處理。
 
 ## VS Code 設定
@@ -158,7 +149,7 @@ R13 保留 R12 的預設節點上限 3000→6000→10000 完整重掃與重驗�
 | 命令 | 用途 |
 | --- | --- |
 | `Codex Auto-Accept: Toggle` | 切換總開關 |
-| `Codex Auto-Accept: Install / Repair Codex GUI Integration` | 首次安裝或修復 GUI 整合；完成後重新載入 |
+| `Codex Auto-Accept: Install / Repair Codex GUI Integration` | 手動修復 GUI 整合，或在還原後重新啟用 |
 | `Codex Auto-Accept: Restore Original Codex Extension` | 還原官方 bundle；完成後重新載入 |
 | `Codex Auto-Accept: Start Codex CLI` | 建立新 terminal，等 shell integration 後啟動 `codex` |
 | `Codex Auto-Accept: Show Log` | 開啟本套件 Output channel |
@@ -261,7 +252,7 @@ VS Code 未提供本套件可用的跨擴充套件 Webview DOM 核准控制 API�
 
 | 現象 | 檢查方式 |
 | --- | --- |
-| ON 但仍顯示「允許一次」 | 確認已安裝 0.1.2，執行 Install / Repair GUI Integration，再 Reload Window。若仍出現，查看兩個 Codex Auto-Accept 輸出頻道 |
+| ON 但仍顯示「允許一次」 | 確認已安裝 0.1.3。若顯示 GUI RELOAD，請重新載入。若顯示 GUI ERROR，查看 Codex Auto-Accept 輸出頻道 |
 | `Unsupported ... bundle/layout` | 在 Codex Auto-Accept 輸出頻道查看官方 Codex 版本及安裝錯誤 |
 | GUI 安裝權限錯誤 | 查看實際錯誤；本套件需要能寫入該官方擴充套件目錄 |
 | `SETTINGS ERROR` | 修正使用者設定中的型別、尺寸或 regex |
