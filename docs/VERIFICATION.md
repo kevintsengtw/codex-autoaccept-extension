@@ -47,3 +47,14 @@ After installing Auto-Accept 0.1.2 on the company computer with VS Code 1.147.0 
 In a follow-up to the Codex update report, the user confirmed that Auto-Accept 0.1.3 successfully auto-approved Codex GUI requests on their company computer.
 
 The repository VSIX was rebuilt with the updated README and verified to contain the same manifest and compiled JavaScript as the tested package. Its checksum is listed in [SHA256SUMS](../artifacts/SHA256SUMS).
+
+## 0.1.4 — detect a stale extension host and repair same-path replacement — 2026-11-25
+
+- The local macOS Codex 26.1120.41243 and 26.1120.50957 builds contain byte-identical extension JavaScript and bundled Codex executables. The official Marketplace Windows x64 package 26.51120.50957 contains the same extension JavaScript. The patched request route is compatible with these copies.
+- In VS Code 1.147.0 with the exact local Codex 26.1120.50957 build and a simulated app-server, the packaged 0.1.3 worked on a clean start. To reproduce the failure, the host first loaded the unpatched bundle and a separate patch operation then updated the files on disk. 0.1.3 logged “already installed” and left an eligible command request pending.
+- With packaged 0.1.4 in the same scenario, the host logged that it needed a reload. Reopening the same profile restored one-time command and file-change approvals. On a separate 0.1.4 cold start, the integration loaded automatically, recovered after the bundle at the same path was replaced with its verified original bytes, and continued approving eligible requests once.
+- 30 unit and lifecycle tests, TypeScript checking, and the 0.1.4 VSIX checksum passed. The running-host tests used macOS.
+
+### Company computer verification for 0.1.4 — 2026-11-25
+
+The user confirmed that Auto-Accept 0.1.4 worked on their company computer. The repository VSIX was rebuilt with the updated README. Its manifest and compiled JavaScript match the verified package, and its checksum is listed in [SHA256SUMS](../artifacts/SHA256SUMS).

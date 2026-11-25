@@ -4,6 +4,8 @@ const {Terminal: HeadlessTerminal} = require('@xterm/headless');
 const {readSettings, readEnabled} = require('./settings');
 const {detect, isCodexCommand} = require('./detector');
 const patcher = require('./patcher');
+const GUI_CHECK_INTERVAL = 3000;
+const TRANSIENT_INSTALL_ERRORS = new Set(['ENOENT', 'EEXIST', 'EACCES', 'EPERM', 'EBUSY']);
 
 /** @param {import("vscode").ExtensionContext} context */
 function activate(context) {
@@ -11,8 +13,9 @@ function activate(context) {
   const status = vscode.window.createStatusBarItem('codexAutoAccept.status', vscode.StatusBarAlignment.Right, 100);
   const watches = new Map();
   let accepted = 0;
-  let lastGuiPath;
+  let guiCheck;
   let guiReloadPath;
+  let guiReady = false;
   let guiError;
   const say = msg => log.appendLine(`${new Date().toISOString()} ${msg}`);
   const settings = () => readSettings(vscode);
@@ -24,6 +27,7 @@ function activate(context) {
     const showGui = s.enabled && s.guiEnabled && !s.configurationError;
     if (showGui && guiError) status.text += ' (GUI ERROR)';
     else if (showGui && guiReloadPath) status.text += ' (GUI RELOAD)';
+    else if (showGui && guiReady) status.text += ' (GUI READY)';
     status.tooltip = [
       s.configurationError && `Invalid settings: ${s.configurationError}. Automatic approvals are paused.`,
       showGui && (guiError || (guiReloadPath && 'Reload Window to load the repaired Codex GUI integration.')),
@@ -41,28 +45,54 @@ function activate(context) {
     const ext = vscode.extensions.getExtension('openai.chatgpt');
     const s = settings();
     if (!interactive && (!s.enabled || !s.guiEnabled || s.configurationError || !vscode.workspace.isTrusted
-      || context.globalState.get('guiInstalled') === false || !ext || lastGuiPath === ext.extensionPath)) return;
+      || context.globalState.get('guiInstalled') === false || !ext)) return;
     const version = ext?.packageJSON.version;
     try {
       if (!ext) throw Error('Codex extension openai.chatgpt is not installed in this extension host.');
-      if (lastGuiPath !== ext.extensionPath) guiReloadPath = undefined;
-      lastGuiPath = ext.extensionPath;
-      const result = patcher.install(ext.extensionPath, runtime);
-      const needsReload = result !== 'already installed' && (ext.isActive || patcher.isLoaded(ext.extensionPath));
-      if (needsReload) guiReloadPath = ext.extensionPath;
-      guiError = undefined;
-      update();
-      say(`GUI integration ${result} for Codex ${version}.`);
+      const root = ext.extensionPath;
+      const sameExtension = guiCheck?.root === root && guiCheck.version === version;
+      if (!sameExtension) guiReloadPath = undefined;
+      const stamp = patcher.fingerprint(root);
+      const sameFiles = sameExtension && guiCheck.stamp === stamp;
+      const retry = sameFiles && guiCheck.retryAt && Date.now() >= guiCheck.retryAt;
+      let result;
+      if (interactive || !sameFiles || retry) {
+        guiCheck = {root, version, stamp, failures: sameFiles ? guiCheck.failures : 0, retryAt: 0};
+        result = patcher.install(root, runtime);
+        guiCheck.stamp = patcher.fingerprint(root);
+        guiCheck.failures = 0;
+        guiError = undefined;
+        say(`GUI integration ${result} for Codex ${version}.`);
+      } else if (guiError) return;
+      const loaded = patcher.loadedState(root);
+      const stale = loaded === 'stale' || (loaded === 'not loaded' && ext.isActive)
+        || (loaded === 'ready' && result === 'runtime updated');
+      const notifyReload = stale && guiReloadPath !== root;
+      if (stale) guiReloadPath = root;
+      const ready = loaded === 'ready' && !guiReloadPath;
+      if (result || interactive || notifyReload || guiReady !== ready) {
+        if (ready && !guiReady) say(`Codex ${version}: GUI integration loaded in this extension host.`);
+        guiReady = ready;
+        update();
+      }
       if (interactive) await context.globalState.update('guiInstalled', true);
-      if (interactive || needsReload) {
-        const answer = await vscode.window.showInformationMessage(`Codex GUI integration is ready for Codex ${version}. Reload this window to load it.`, 'Reload Window');
+      if (notifyReload) say(`Codex ${version}: the running extension host needs to reload the GUI integration.`);
+      if (notifyReload || (interactive && guiReloadPath)) {
+        const answer = await vscode.window.showInformationMessage(`Reload this window to load the Codex ${version} GUI integration.`, 'Reload Window');
         if (answer) await vscode.commands.executeCommand('workbench.action.reloadWindow');
+      } else if (interactive) {
+        void vscode.window.showInformationMessage(`Codex ${version} GUI integration is installed.`);
       }
     } catch (err) {
       const message = `GUI integration${version ? ` for Codex ${version}` : ''}: ${err.message}`;
+      const code = err.cause?.code ?? err.code;
+      if (guiCheck?.root === ext?.extensionPath && TRANSIENT_INSTALL_ERRORS.has(code) && ++guiCheck.failures <= 2) {
+        guiCheck.retryAt = Date.now() + GUI_CHECK_INTERVAL;
+      }
+      if (guiError !== message) say(message);
       guiError = message;
+      guiReady = false;
       update();
-      say(message);
       if (interactive) vscode.window.showErrorMessage(message);
     }
   }
@@ -148,6 +178,7 @@ function activate(context) {
       await context.globalState.update('guiInstalled', false);
       guiError = undefined;
       guiReloadPath = undefined;
+      guiReady = false;
       update();
       const answer = await vscode.window.showInformationMessage('Original Codex extension restored. Reload to unload the integration.', 'Reload Window');
       if (answer) await vscode.commands.executeCommand('workbench.action.reloadWindow');
@@ -171,6 +202,9 @@ function activate(context) {
     context.subscriptions.push(listener, {dispose: () => clearTimeout(timeout)});
     launch();
   });
+  // VS Code can replace the same extension directory without publishing an extension-list event.
+  const guiTimer = setInterval(() => { void installGui(false); }, GUI_CHECK_INTERVAL);
+  guiTimer.unref();
   context.subscriptions.push(log, status,
     vscode.window.onDidStartTerminalShellExecution(e => { void watchExecution(e); }),
     vscode.window.onDidEndTerminalShellExecution(e => stop(e.execution)),
@@ -182,17 +216,22 @@ function activate(context) {
     }),
     vscode.extensions.onDidChange(() => {
       if (!vscode.extensions.getExtension('openai.chatgpt')) {
-        lastGuiPath = undefined;
+        guiCheck = undefined;
         guiReloadPath = undefined;
+        guiReady = false;
         guiError = undefined;
         update();
       }
       void installGui(false);
     }),
-    {dispose: () => { for (const execution of watches.keys()) stop(execution); }}
+    {dispose: () => {
+      clearInterval(guiTimer);
+      for (const execution of watches.keys()) stop(execution);
+    }}
   );
   update();
   // VS Code activates the wildcard extension before sending onStartupFinished to Codex.
   void installGui(false);
+  return {guiAllowed: () => !guiError && context.globalState.get('guiInstalled') !== false};
 }
 module.exports = {activate};

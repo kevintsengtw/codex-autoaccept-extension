@@ -32,7 +32,10 @@ function host(t, options = {}) {
       if (name === 'vscode') return vscode;
       if (name === './patcher' && options.patcher) return options.patcher;
       return localRequire(name);
-    }, setTimeout, clearTimeout
+    },
+    setTimeout, clearTimeout,
+    setInterval: fn => {listeners.guiCheck = fn; return {unref(){}};},
+    clearInterval() {}
   });
   const context = {
     extensionPath: process.cwd(),
@@ -117,13 +120,13 @@ test('ON prepares a new Codex install before activation and repairs a later vers
   const installed = [];
   const options = {
     vendor: {extensionPath: '/old-codex', packageJSON: {version: 'old'}, isActive: false},
-    patcher: {install: path => {installed.push(path); return 'installed';}, isLoaded: () => false}
+    patcher: {install: path => {installed.push(path); return 'installed';}, fingerprint: () => 'same', loadedState: () => 'not loaded'}
   };
   const h = host(t, options);
   assert.deepEqual(installed, ['/old-codex']);
   assert.equal(h.notices.length, 0);
   options.vendor = {extensionPath: '/updated-codex', packageJSON: {version: 'new'}, isActive: false};
-  options.patcher.isLoaded = () => true;
+  options.patcher.loadedState = () => 'stale';
   h.listeners.extensions();
   h.listeners.extensions();
   assert.deepEqual(installed, ['/old-codex', '/updated-codex']);
@@ -139,7 +142,8 @@ test('OFF leaves Codex untouched and explicitly restored GUI stays manual until 
     patcher: {
       install: () => {installs++; return 'installed';},
       restore: () => 'restored',
-      isLoaded: () => false
+      fingerprint: () => 'same',
+      loadedState: () => 'not loaded'
     }
   };
   const h = host(t, options);
@@ -159,15 +163,60 @@ test('unsupported Codex integration is visible while ON and explicit repair can 
   let attempts = 0;
   const h = host(t, {
     vendor: {extensionPath: '/codex', packageJSON: {version: 'test'}},
-    patcher: {install: () => {
-      attempts++;
-      if (attempts === 1) throw Error('Unsupported Codex bundle');
-      return 'already installed';
-    }}
+    patcher: {
+      fingerprint: () => 'same',
+      loadedState: () => 'not loaded',
+      install: () => {
+        attempts++;
+        if (attempts === 1) throw Error('Unsupported Codex bundle');
+        return 'already installed';
+      }
+    }
   });
   assert.match(h.status.text, /ON.*GUI ERROR/);
   assert.match(h.status.tooltip, /Codex test.*Unsupported Codex bundle/);
   await h.commands['codexAutoAccept.installGui']();
   assert.equal(attempts, 2);
   assert.doesNotMatch(h.status.text, /GUI ERROR/);
+});
+
+test('a disk patch from another host still prompts to reload when this host loaded the stock bundle', t => {
+  let installs = 0;
+  const h = host(t, {
+    vendor: {extensionPath: '/codex', packageJSON: {version: 'test'}, isActive: false},
+    patcher: {
+      fingerprint: () => 'already patched',
+      loadedState: () => 'stale',
+      install: () => {installs++; return 'already installed';}
+    }
+  });
+  assert.match(h.status.text, /GUI RELOAD/);
+  h.listeners.guiCheck();
+  assert.equal(installs, 1);
+  assert.equal(h.notices.length, 1);
+});
+
+test('health check repairs same-path replacement and confirms when the running host loads the hook', t => {
+  let stamp = 'stock';
+  let loaded = 'not loaded';
+  let installs = 0;
+  const h = host(t, {
+    vendor: {extensionPath: '/codex', packageJSON: {version: 'test'}},
+    patcher: {
+      fingerprint: () => stamp,
+      loadedState: () => loaded,
+      install: () => {stamp = 'patched'; installs++; return 'installed';}
+    }
+  });
+  assert.doesNotMatch(h.status.text, /GUI READY/);
+  loaded = 'ready';
+  h.listeners.guiCheck();
+  assert.match(h.status.text, /GUI READY/);
+  assert.equal(installs, 1);
+  stamp = 'stock restored by updater';
+  h.listeners.guiCheck();
+  h.listeners.guiCheck();
+  assert.equal(installs, 2);
+  assert.match(h.status.text, /GUI READY/);
+  assert.equal(h.notices.length, 0);
 });

@@ -2,9 +2,13 @@ const vscode = require('vscode');
 const {readSettings} = require('./settings');
 const {decision} = require('./gui-decision');
 let log;
+let entryPath;
+function markLoaded(filename) { entryPath = filename; }
+function loadedFrom() { return entryPath; }
 function decide(request) {
   try {
-    if (!vscode.workspace.isTrusted || !vscode.extensions.getExtension('local-tools.codex-autoaccept')?.isActive) return null;
+    const extension = vscode.extensions.getExtension('local-tools.codex-autoaccept');
+    if (!vscode.workspace.isTrusted || !extension?.isActive || extension.exports?.guiAllowed?.() === false) return null;
     const d = decision(request, readSettings(vscode));
     if (!d) return null;
     log ??= vscode.window.createOutputChannel('Codex Auto-Accept GUI');
@@ -13,4 +17,4 @@ function decide(request) {
     return d.respond ? d.result : null;
   } catch { return null; }
 }
-module.exports = {decide};
+module.exports = {decide, markLoaded, loadedFrom};

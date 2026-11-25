@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const vm = require('node:vm');
+const crypto = require('node:crypto');
 const {Terminal} = require('@xterm/headless');
 const {detect, isCodexCommand} = require('../src/detector');
 const {evaluate} = require('../src/policy');
@@ -120,6 +121,57 @@ test('partial installation restores safely when original is still intact', t => 
   const {root,source}=fixture(t);
   fs.writeFileSync(path.join(root,'out/extension.js.codex-autoaccept-original'),source);
   assert.equal(patcher.restore(root),'restored');
+});
+test('a verified replacement with original bytes is repaired in place', t => {
+  const {root, source, runtime} = fixture(t);
+  const file = path.join(root, 'out/extension.js');
+  patcher.install(root, runtime);
+  const installed = fs.readFileSync(file, 'utf8');
+  const before = patcher.fingerprint(root);
+  fs.writeFileSync(file, source);
+  assert.notEqual(patcher.fingerprint(root), before);
+  assert.equal(patcher.install(root, runtime), 'installed');
+  assert.equal(fs.readFileSync(file, 'utf8'), installed);
+  assert.equal(patcher.restore(root), 'restored');
+  assert.equal(fs.readFileSync(file, 'utf8'), source);
+});
+test('verified earlier patch upgrades and restores its original backup', t => {
+  const {root, source, runtime} = fixture(t);
+  const file = path.join(root, 'out/extension.js');
+  const hash = text => crypto.createHash('sha256').update(text).digest('hex');
+  const previous = source + '\n/* codex-autoaccept:v1 */\n';
+  fs.writeFileSync(file, previous);
+  fs.writeFileSync(file + '.codex-autoaccept-original', source);
+  fs.writeFileSync(file + '.codex-autoaccept.json', JSON.stringify({original: hash(source), patched: hash(previous)}));
+  assert.equal(patcher.install(root, runtime), 'installed');
+  assert.match(fs.readFileSync(file, 'utf8'), /markLoaded\(__filename\)/);
+  assert.equal(patcher.restore(root), 'restored');
+  assert.equal(fs.readFileSync(file, 'utf8'), source);
+});
+test('a cached original is stale even when disk and backup verify as installed', t => {
+  const {root, runtime} = fixture(t);
+  const file = fs.realpathSync(path.join(root, 'out/extension.js'));
+  const helper = path.join(path.dirname(file), 'codex-autoaccept-runtime.cjs');
+  t.after(() => {
+    delete require.cache[file];
+    delete require.cache[helper];
+  });
+  fs.writeFileSync(runtime, 'let entry;module.exports={decide:()=>null,markLoaded:value=>entry=value,loadedFrom:()=>entry};');
+  require(file);
+  assert.equal(patcher.install(root, runtime), 'installed');
+  assert.equal(patcher.install(root, runtime), 'already installed');
+  assert.equal(patcher.loadedState(root), 'stale');
+  delete require.cache[file];
+  require(file);
+  assert.equal(patcher.loadedState(root), 'ready');
+});
+test('renaming or reordering observers preserves the verified dispatch and reply anchors', t => {
+  const {source} = fixture(t);
+  const changed = source.replaceAll('turnCwds', 'trace').replace(
+    'this.trace.observeServerRequest(e),this.requestUserInputAutoResolutionCoordinator.observeServerRequest(e);',
+    'this.input.observeServerRequest(e);this.trace.observeServerRequest(e),this.metrics.observeServerRequest(e);'
+  );
+  assert.match(patcher.patchedSource(changed), /markLoaded\(__filename\)/);
 });
 test('malformed user configuration disables approval instead of coercing truthy values', () => {
   for (const values of [{enabled:'false'}, {enabled:true,terminalRows:0}, {enabled:true,denyPatterns:[true]}]) {
